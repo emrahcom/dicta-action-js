@@ -3,7 +3,8 @@
 The browser side of dicta actions. It sends the user's request and the page
 state to `dicta-action-server`, then runs the plan it gets back by calling the
 site's capability functions. It asks the user to confirm destructive and
-external steps, and shows progress and results.
+external steps, and shows progress and results. It takes the request as text
+from any source, for example the `dicta-text` event of dicta-js.
 
 ## Specs and tasks
 
