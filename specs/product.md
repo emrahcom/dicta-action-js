@@ -11,6 +11,9 @@ the site's capability functions, with the user's own rights.
 
 - A browser library with one element that shows what happens to a request: its
   progress, questions, confirmations and the result.
+- A plan runner: it checks each plan, resolves its references, runs its steps
+  and loops by calling the site's own functions, and reports the results. It
+  never runs code it receives.
 - Independent of where the text comes from: `dicta-js`, a plain text field or
   anything else. The application passes the text in.
 - Independent of UI frameworks: it works in any web page.
@@ -20,8 +23,6 @@ the site's capability functions, with the user's own rights.
 - Not an input element. Typing and speech belong to `dicta-js` or the page.
 - Not a planner. The server decides every step; the client only runs plans and
   reports back.
-- Not a code runner. A plan is data that calls the site's own functions; the
-  client never runs code it receives.
 - Not the place for authentication. The application's backend issues the token.
 
 ## First version
