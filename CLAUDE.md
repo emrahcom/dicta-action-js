@@ -18,6 +18,17 @@ from any source, for example the `dicta-text` event of dicta-js.
   `YYYY-MM-DD-HHMMSS-slug.md` (UTC). The folder is the status. `specs/tasks.md`
   defines the format, including how findings are handled.
 
+## Verification commands
+
+Run them after every change.
+
+- Format and type check: `npm run check`
+- Lint: `npm run lint`
+- Tests: `npm run test`
+- Build: `npm run build`
+
+`npm run format` fixes formatting.
+
 ## User documents
 
 The README and other user documents use simple English: short sentences, common
