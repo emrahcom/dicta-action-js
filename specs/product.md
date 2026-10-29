@@ -10,10 +10,10 @@ the site's capability functions, with the user's own rights.
 ## What it is
 
 - A browser library with one element that shows what happens to a request: its
-  progress, questions, confirmations and the result.
+  progress, questions, confirmations and the outcome.
 - A plan runner: it checks each plan, resolves its references, runs its steps
-  and loops by calling the site's own functions, and reports the results. It
-  never runs code it receives.
+  and loops by calling the site's own functions, and reports the outputs the
+  plan asks for. It never runs code it receives.
 - Independent of where the text comes from: `dicta-js`, a plain text field or
   anything else. The application passes the text in.
 - Independent of UI frameworks: it works in any web page.
