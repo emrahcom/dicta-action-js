@@ -10,9 +10,9 @@ dicta-js. The details are in `specs/`.
 
 - `specs/` is authoritative; code follows it. Specs are living documents: write
   only what the next task needs and update them whenever needed.
-- The action contracts (protocol, plan format, capability format, site context
-  format) are in `dicta-action-server`, the source of truth for all action
-  repos. They are not copied here. Locally they are in
+- The action contracts (the protocol, the plan format, the capability format and
+  the site context format) are in `dicta-action-server`, the source of truth for
+  all action repos. They are not copied here. Locally they are in
   `../dicta-action-server/specs/`, otherwise
   https://github.com/emrahcom/dicta-action-server/tree/main/specs
 - Tasks are files in `tasks/open/` and `tasks/done/`, named
