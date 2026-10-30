@@ -1,18 +1,19 @@
 # dicta-action-js
 
-The browser side of dicta actions. It sends the user's request, the page state
-and the site context to `dicta-action-server`, then runs the plan it gets back
-by calling the site's capability functions. It asks the user to confirm risky
-steps, and shows progress and the outcome. It takes the request as text from any
-source, for example the `dicta-text` event of dicta-js.
+The browser side of dicta actions. dicta actions let users control a web
+application in their own words, through AI. This library sends the request to
+`dicta-action-server` and acts on its replies; it runs plans with the site's own
+functions and the user's rights. The text can come from any source, for example
+dicta-js. The details are in `specs/`.
 
 ## Specs and tasks
 
 - `specs/` is authoritative; code follows it. Specs are living documents: write
   only what the next task needs and update them whenever needed.
-- The action contracts (protocol, plan format, capability format) are in
-  `dicta-action-server`, the source of truth for all action repos. They are not
-  copied here. Locally they are in `../dicta-action-server/specs/`, otherwise
+- The action contracts (protocol, plan format, capability format, site context
+  format) are in `dicta-action-server`, the source of truth for all action
+  repos. They are not copied here. Locally they are in
+  `../dicta-action-server/specs/`, otherwise
   https://github.com/emrahcom/dicta-action-server/tree/main/specs
 - Tasks are files in `tasks/open/` and `tasks/done/`, named
   `YYYY-MM-DD-HHMMSS-slug.md` (UTC). The folder is the status. `specs/tasks.md`
