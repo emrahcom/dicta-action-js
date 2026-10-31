@@ -88,12 +88,12 @@ The element runs one request at a time. `submit(text)`:
 - While a question is open: answers it.
 - While a confirmation is open: is ignored; only its buttons answer it
   (`contract-protocol.md`, Added text and cancel).
-- While the element waits for the server or runs a plan: is added text
-  (`contract-protocol.md`, Added text and cancel). The client takes all text
-  that comes; background speech from an always-open microphone is a known open
-  point.
-- From the start of a page load until the page is left: is ignored, and the
-  element shows the `pageLoad` text as a notice (Display;
+- While the element waits for the server or runs a plan, before a page load
+  starts: is added text (`contract-protocol.md`, Added text and cancel). The
+  client takes all text that comes; background speech from an always-open
+  microphone is a known open point.
+- From the start of a page load during a request until the page is left: is
+  ignored, and the element shows the `pageLoad` text as a notice (Display;
   `contract-protocol.md`, Page changes).
 - Text over 10000 characters (Unicode code points) is not taken: the element
   shows the `tooLong` text as a notice (Display) and nothing else changes
@@ -174,10 +174,10 @@ The runner follows `contract-plan.md` and builds the report of
   Added text and cancel).
 - A page load is seen after each step, and in a `forEach` after each call: a
   `navigate` event of the Navigation API whose destination is another document
-  (`destination.sameDocument` is false) since the step started. The runner then
-  stops and the element waits for the page to be left (`contract-protocol.md`,
-  Page changes). In a browser without the Navigation API, page loads are not
-  seen and the runner goes on.
+  (`destination.sameDocument` is false) since the step or call started. The
+  runner then stops and the element waits for the page to be left
+  (`contract-protocol.md`, Page changes). In a browser without the Navigation
+  API, page loads are not seen and the runner goes on.
 - Error messages are cut to 200 characters. Included outputs are counted as the
   UTF-8 bytes of their JSON, at most 16 KB together.
 
