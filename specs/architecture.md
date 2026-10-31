@@ -66,10 +66,9 @@ CSS parts let the integrator style or hide each part of the element:
 - `option`, `continue`, `cancel`, `close`: the buttons.
 - `notice`: a notice (Display).
 
-The element has a custom state that names the view shown, one at a time:
-`working`, `question` or `confirmation` while a request runs, and `stop`,
-`error` or `info` after it (Display). With the state, a part is styled in one
-view only:
+While a view is shown, the element has a custom state with the view's name
+(Display): `working`, `question`, `confirmation`, `stop`, `error` or `info`.
+With the state, a part is styled in one view only:
 
 ```css
 dicta-action:state(info)::part(view) {
@@ -114,34 +113,39 @@ developers.
 
 The element shows little: the user wants the task done, not to read.
 
-From the submit until the request ends, the element shows one view at a time,
-and each view has its own Cancel button, placed to fit the view:
+The element shows one view at a time, or none. The name of the view shown is
+also the element's custom state (Element), for styling.
 
-- Working, while the element waits for the server or runs a plan: a progress
+While a request runs, from the submit on, each view has its own Cancel button,
+placed to fit the view:
+
+- `working`, while the element waits for the server or runs a plan: a progress
   indicator, with the label of the running plan when it has one, and Cancel. The
   indicator is a small spinner drawn with CSS. When the user prefers reduced
   motion (`prefers-reduced-motion`), it stands still.
-- Question: the question's text, its options as buttons and Cancel. A click on
+- `question`: the question's text, its options as buttons and Cancel. A click on
   an option answers with the option's text.
-- Confirmation: only the texts from the module's `confirm` as plain text,
+- `confirmation`: only the texts from the module's `confirm` as plain text,
   without the plan's label (`contract-plan.md`, Confirmation), Continue and
   Cancel. For a `forEach`, the number of items and the first three items.
 
-An answer or Continue brings back the working view. Cancel in any view cancels
-the request (`contract-protocol.md`, Added text and cancel).
+An answer or Continue brings back `working`. Cancel in any view cancels the
+request (`contract-protocol.md`, Added text and cancel).
 
-After the request, or beside it:
+After a request, each view has a Close button:
 
-- A notice: a short text that goes away by itself and never waits for a click:
-  the text of a done and the `tooLong` text. It is shown for `notice-duration`
-  seconds. While the pointer is over it or it has focus, it stays, and the time
-  starts again when they leave.
-- Done with a text: its text is shown as a notice. Done without a text: nothing
-  is shown; the progress indicator goes away.
-- Stop and error: views with the text and Close, shown until the user closes
-  them or submits new text.
-- Info: a view with the text, in its paragraphs, and Close, shown until the user
-  closes it (`contract-protocol.md`, Response body).
+- `stop` and `error`: the text and Close, until the user closes it or submits
+  new text.
+- `info`: the text, in its paragraphs, and Close, until the user closes it
+  (`contract-protocol.md`, Response body).
+
+A done shows no view: with a text, the text is shown as a notice; without one,
+nothing is shown.
+
+A notice is a short text that goes away by itself and never waits for a click:
+the text of a done and the `tooLong` text. It is not a view, so it can be shown
+beside one. It is shown for `notice-duration` seconds. While the pointer is over
+it or it has focus, it stays, and the time starts again when they leave.
 
 ## Plan runner
 
