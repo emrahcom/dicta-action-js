@@ -27,6 +27,8 @@ const STRINGS = {
 type StringKey = keyof typeof STRINGS;
 
 const DEFAULT_NOTICE_SECONDS = 5;
+// How long the status region stays empty before a new text.
+const ANNOUNCE_DELAY_MS = 100;
 
 const STYLE = `
   :host {
@@ -125,6 +127,7 @@ export class DictaAction extends HTMLElement {
   #noticeTimer: ReturnType<typeof setTimeout> | undefined;
   #noticeHovered = false;
   #noticeFocused = false;
+  #announceTimer: ReturnType<typeof setTimeout> | undefined;
 
   constructor() {
     super();
@@ -366,6 +369,10 @@ export class DictaAction extends HTMLElement {
     clearTimeout(this.#noticeTimer);
     this.#notice.hidden = true;
     this.#notice.textContent = "";
+    // A hidden notice does not reliably get blur (Firefox, WebKit) or
+    // pointerleave.
+    this.#noticeHovered = false;
+    this.#noticeFocused = false;
   }
 
   // Starts the notice's time again, unless the pointer or the focus is on it.
@@ -386,7 +393,13 @@ export class DictaAction extends HTMLElement {
     return seconds >= 1 ? seconds : DEFAULT_NOTICE_SECONDS;
   }
 
+  // Clears the status region first and sets the text a moment later, so a
+  // text equal to the last one is announced again.
   #announce(text: string) {
-    this.#announcer.textContent = text;
+    clearTimeout(this.#announceTimer);
+    this.#announcer.textContent = "";
+    this.#announceTimer = setTimeout(() => {
+      this.#announcer.textContent = text;
+    }, ANNOUNCE_DELAY_MS);
   }
 }
