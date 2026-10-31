@@ -260,6 +260,8 @@ The element meets WCAG 2.2 level AA.
   region, which is separate from the visible parts, so hiding a part does not
   silence it. An announcement never replaces one that is not read yet; they are
   read one after the other.
+- A question is announced with its options, each after the question's text, so a
+  screen reader user knows the options are there.
 - An info's text is not announced, since it can be long: the `info` string is.
   Its notice can take the focus, so the user moves to it to read the text.
 - A screen reader user hears every request from start to end, also where the
