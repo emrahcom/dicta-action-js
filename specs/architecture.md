@@ -242,7 +242,9 @@ The element meets WCAG 2.2 level AA.
 - The element never takes the focus from outside it. A new view does not take it
   from the site's text field, so Enter there can never press Continue.
 - When a view goes away while the focus is in it, the focus moves to the next
-  view's Cancel or Close.
+  view's Cancel or Close. When no view follows, it goes back to the page element
+  it came from into the view, usually the site's text field. If that one is
+  gone, it goes to the `<dicta-action>` element itself (`tabindex="-1"`).
 - Progress, questions, confirmations, outcomes and notices are announced through
   a status region, which is separate from the visible parts, so hiding a part
   does not silence it.
