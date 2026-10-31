@@ -98,7 +98,7 @@ async function ask(confirmation: Confirmation) {
 async function run(plan: Plan, using = module) {
   calls.length = 0;
   asked.length = 0;
-  return runPlan(plan, using, ask);
+  return runPlan(plan, using, ask, () => undefined, newProgress());
 }
 
 const list = { call: "tasks.list", args: {} };
@@ -541,6 +541,7 @@ test("a stop before a step halts there", async () => {
     module,
     ask,
     stopAt(2, "interrupted"),
+    newProgress(),
   );
   assert.deepEqual(report.halt, {
     step: 2,
@@ -570,6 +571,7 @@ test("a stop in a forEach halts at the next item, without do", async () => {
     module,
     ask,
     stopAt(3, "cancelled"),
+    newProgress(),
   );
   assert.deepEqual(report.halt, {
     step: 2,
@@ -597,6 +599,7 @@ test("a forEach stopped between items without includeOutput", async () => {
     module,
     ask,
     stopAt(3, "interrupted"),
+    newProgress(),
   );
   assert.equal(report.halt?.item, 1);
   assert.equal(Object.hasOwn(report.halt ?? {}, "outputs"), false);
@@ -609,6 +612,7 @@ test("a stop after the last step does not halt", async () => {
     module,
     ask,
     stopAt(2, "interrupted"),
+    newProgress(),
   );
   assert.deepEqual(report, {});
 });
@@ -640,7 +644,7 @@ test("the report so far halts at the running step with its outputs", async () =>
     },
     leaving,
     ask,
-    undefined,
+    () => undefined,
     progress,
   );
   assert.equal(running, true);
@@ -684,7 +688,7 @@ test("the report so far in a forEach has its item, call and outputs", async () =
     },
     leaving,
     ask,
-    undefined,
+    () => undefined,
     progress,
   );
   assert.deepEqual(soFar, {

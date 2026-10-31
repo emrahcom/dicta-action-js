@@ -237,8 +237,8 @@ export async function runPlan(
   plan: Plan,
   module: CapabilityModule,
   ask: Ask,
-  stop: () => Stop | undefined = () => undefined,
-  progress: Progress = newProgress(),
+  stop: () => Stop | undefined,
+  progress: Progress,
 ): Promise<Report> {
   const outputs: unknown[] = [];
   const included = progress.included;
