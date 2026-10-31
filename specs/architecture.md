@@ -199,14 +199,17 @@ for example with the site's own translations:
 - `continue`: "Continue"
 - `cancel`: "Cancel"
 - `close`: "Close"
+- `done`: "Done", announced only, for a done without a text (Accessibility)
 - `error`: "Something went wrong"
 - `items`: "{count} items", the number of items in a `forEach` confirmation
   (Display); the element puts the number in place of `{count}`
 - `tooLong`: "The text is too long"
+- `working`: "Working", announced only, when a request starts or goes on in a
+  new page (Accessibility)
 
 A key left out keeps its English string. An unknown key, or a value that is not
-a string, is ignored. The element reads `strings` each time it shows one, so a
-site that changes its language sets `strings` again.
+a string, is ignored. The element reads `strings` each time it shows or
+announces one, so a site that changes its language sets `strings` again.
 
 Texts from the server and from the module's `confirm` are shown as they come,
 always as plain text, never as HTML.
@@ -223,4 +226,8 @@ The element meets WCAG 2.2 level AA.
 - Progress, questions, confirmations, outcomes and notices are announced through
   a status region, which is separate from the visible parts, so hiding a part
   does not silence it.
+- A screen reader user hears every request from start to end, also where the
+  screen shows little: the `working` string when a request starts or goes on in
+  a new page, the plan's label when it has one, and the `done` string for a done
+  without a text. These two strings are announced only, never shown.
 - All text and buttons have enough contrast.
