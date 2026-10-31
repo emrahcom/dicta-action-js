@@ -4,7 +4,8 @@
 import type { SiteContext } from "./context.ts";
 import type { CapabilityModule } from "./module.ts";
 import { checkPlan, type Plan } from "./plan.ts";
-import { type Reply, RoundClient } from "./round.ts";
+import { addHistory, type Outcome } from "./history.ts";
+import { localTime, type Reply, RoundClient } from "./round.ts";
 import { type Confirmation, cut, type Report, runPlan } from "./run.ts";
 
 type View = "working" | "question" | "confirmation" | "stop" | "error" | "info";
@@ -20,6 +21,8 @@ type Request = {
   confirming?: boolean;
   // Text the user added that is not in the exchange yet.
   added: string[];
+  // While a plan runs; a cancel then waits for its last report.
+  running?: boolean;
 };
 
 // The element's own strings (specs/architecture.md, Strings).
@@ -221,7 +224,7 @@ export class DictaAction extends HTMLElement {
       }));
     } catch (err) {
       if (this.#request === request) {
-        this.#fail(err);
+        this.#fail(request, err);
       }
       return;
     }
@@ -265,6 +268,9 @@ export class DictaAction extends HTMLElement {
     if (this.#request === request) {
       this.#request = undefined;
     }
+    if (reply.type !== "plan" && reply.type !== "question") {
+      this.#store(request, { type: reply.type, text: reply.text });
+    }
     if (reply.type === "done") {
       this.#hideView();
       if (reply.text) {
@@ -288,6 +294,7 @@ export class DictaAction extends HTMLElement {
         if (text) {
           this.#announce(text);
         }
+        request.running = true;
         report = await runPlan(
           plan as Plan,
           client.module,
@@ -301,15 +308,19 @@ export class DictaAction extends HTMLElement {
         );
       }
     } catch (err) {
+      request.running = false;
       if (this.#request === request) {
-        this.#fail(err);
+        this.#fail(request, err);
       }
       return;
     }
+    request.running = false;
+    request.exchange.push({ plan, report });
     if (this.#request !== request) {
+      // Cancelled while the plan ran: stored with this last report.
+      this.#store(request, { type: "cancelled" });
       return;
     }
-    request.exchange.push({ plan, report });
     // Text that came after the last step follows the report without a halt.
     this.#takeAdded(request);
     void this.#round(request);
@@ -356,8 +367,9 @@ export class DictaAction extends HTMLElement {
     return this.#client;
   }
 
-  #fail(err: unknown) {
+  #fail(request: Request, err: unknown) {
     this.#request = undefined;
+    this.#store(request, { type: "error" });
     // The message as text, since browsers print an error object differently.
     console.error(
       `dicta-action: ${err instanceof Error ? err.message : String(err)}`,
@@ -365,9 +377,33 @@ export class DictaAction extends HTMLElement {
     this.#showEnd("error", this.#string("error"));
   }
 
+  // Ends the request. While a plan runs, the running step finishes first and
+  // the request is stored with its last report (#runPlan).
   #cancel() {
+    const request = this.#request;
     this.#request = undefined;
     this.#hideView();
+    if (request !== undefined && !request.running) {
+      this.#store(request, { type: "cancelled" });
+    }
+  }
+
+  // Adds a finished request to the history, once. One without a requestId ran
+  // nothing and is not stored (contract-capability.md, History).
+  #store(request: Request, outcome: Outcome) {
+    if (request.requestId === undefined) {
+      return;
+    }
+    if (outcome.text === undefined) {
+      delete outcome.text;
+    }
+    addHistory({
+      requestId: request.requestId,
+      time: localTime(new Date()),
+      text: request.text,
+      outcome,
+      exchange: JSON.parse(JSON.stringify(request.exchange)) as unknown[],
+    });
   }
 
   #string(key: StringKey) {

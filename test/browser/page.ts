@@ -149,3 +149,13 @@ export function finishStep(page: Page) {
 export function runs(page: Page) {
   return page.evaluate(() => (window as unknown as { runs: number }).runs);
 }
+
+// The history the element keeps in session storage.
+export function history(page: Page) {
+  return page.evaluate(
+    () =>
+      JSON.parse(
+        sessionStorage.getItem("dicta-action-history") ?? "[]",
+      ) as Record<string, unknown>[],
+  );
+}
