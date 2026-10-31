@@ -245,14 +245,14 @@ test("the status region announces the outcome", async ({ page }) => {
   await reply(page, { type: "stop", text: "Not about this site." });
   await openPage(page);
   await submit(page, "a");
-  await expect(page.locator(status)).toHaveText("Not about this site.");
+  await expect(page.locator(status)).toHaveText("Working Not about this site.");
 });
 
 test("the status region announces a notice", async ({ page }) => {
   await reply(page, { type: "done", text: "Moved 2 tasks." });
   await openPage(page);
   await submit(page, "a");
-  await expect(page.locator(status)).toHaveText("Moved 2 tasks.");
+  await expect(page.locator(status)).toHaveText("Working Moved 2 tasks.");
 });
 
 test("the focus moves from Cancel to the next view's Close", async ({

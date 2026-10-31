@@ -30,7 +30,9 @@ test("a destructive step shows the confirmation view", async ({ page }) => {
   // The confirmation shows only the module's words, not the plan's label.
   await expect(page.locator('[part~="label"]')).toHaveCount(0);
   expect(await inState(page, "confirmation")).toBe(true);
-  await expect(page.locator('[role="status"]')).toHaveText("Delete task t1");
+  await expect(page.locator('[role="status"]')).toHaveText(
+    "Working Deleting the task Delete task t1",
+  );
   expect(await deleted(page)).toEqual([]);
 });
 

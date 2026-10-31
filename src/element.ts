@@ -182,6 +182,8 @@ export class DictaAction extends HTMLElement {
   #noticeHovered = false;
   #noticeFocused = false;
   #announceTimer: ReturnType<typeof setTimeout> | undefined;
+  // The texts waiting to be set in the status region.
+  #announcePending: string[] = [];
   // The page element the focus came from into the view, to go back to.
   #focusFrom: HTMLElement | undefined;
 
@@ -825,12 +827,15 @@ export class DictaAction extends HTMLElement {
   }
 
   // Clears the status region first and sets the text a moment later, so a
-  // text equal to the last one is announced again.
+  // text equal to the last one is announced again. A text that is still
+  // waiting is set together with the new one, never replaced by it.
   #announce(text: string) {
     clearTimeout(this.#announceTimer);
+    this.#announcePending.push(text);
     this.#announcer.textContent = "";
     this.#announceTimer = setTimeout(() => {
-      this.#announcer.textContent = text;
+      this.#announcer.textContent = this.#announcePending.join("\n");
+      this.#announcePending = [];
     }, ANNOUNCE_DELAY_MS);
   }
 }

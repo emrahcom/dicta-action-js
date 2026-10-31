@@ -65,8 +65,9 @@ test("an equal text is announced again", async ({ page }) => {
   const seen = () =>
     page.evaluate(() => (window as unknown as { seen: string[] }).seen);
   await submit(page, "a");
-  await expect.poll(seen).toEqual(["No."]);
+  // Working and the stop come within a moment, so both are set together.
+  await expect.poll(seen).toEqual(["Working\nNo."]);
   await submit(page, "b");
   // Cleared before the equal text, so screen readers notice the change.
-  await expect.poll(seen).toEqual(["No.", "", "No."]);
+  await expect.poll(seen).toEqual(["Working\nNo.", "", "Working\nNo."]);
 });

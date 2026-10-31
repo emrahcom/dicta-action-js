@@ -30,7 +30,7 @@ test("Done is announced for a done without a text, not shown", async ({
   await replies(page, { type: "done" });
   await openPage(page);
   await submit(page, "a");
-  await expect(page.locator(status)).toHaveText("Done");
+  await expect(page.locator(status)).toHaveText("Working Done");
   expect(await shownText(page)).not.toContain("Done");
   await expect(page.locator('[part~="notice"]')).toBeHidden();
 });
@@ -39,7 +39,7 @@ test("a done with a text announces its text, not Done", async ({ page }) => {
   await replies(page, { type: "done", text: "Moved 2 tasks." });
   await openPage(page);
   await submit(page, "a");
-  await expect(page.locator(status)).toHaveText("Moved 2 tasks.");
+  await expect(page.locator(status)).toHaveText("Working Moved 2 tasks.");
 });
 
 test("strings override Working and Done", async ({ page }) => {
@@ -82,4 +82,20 @@ test("Working is announced when a request goes on in a new page", async ({
   await submit(page, "reload");
   await expect.poll(() => rounds, { timeout: 10_000 }).toBe(2);
   await expect(page.locator(status)).toHaveText("Working");
+});
+
+test("a stop is still announced when held text starts a new request", async ({
+  page,
+}) => {
+  const routes = await holdRounds(page);
+  await openPage(page);
+  await submit(page, "a");
+  await expect(page.locator(status)).toHaveText("Working");
+  await submit(page, "b");
+  await routes[0].fulfill({
+    json: { requestId: "r1", reply: { type: "stop", text: "No." } },
+  });
+  // The held text starts a new request at once; the stop is read first.
+  await expect(page.locator(status)).toHaveText("No. Working");
+  await expect.poll(() => routes.length).toBe(2);
 });

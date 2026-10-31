@@ -26,7 +26,9 @@ test("a question shows its text, its options and Cancel", async ({ page }) => {
   ]);
   await expect(page.getByRole("button", { name: "Cancel" })).toBeVisible();
   expect(await inState(page, "question")).toBe(true);
-  await expect(page.locator('[role="status"]')).toHaveText("Which Friday?");
+  await expect(page.locator('[role="status"]')).toHaveText(
+    "Working Which Friday?",
+  );
 });
 
 test("a submit answers the question in the next round", async ({ page }) => {

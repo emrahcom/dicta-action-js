@@ -100,7 +100,9 @@ test("the working view shows and announces the plan's label", async ({
   });
   await submit(page, "a");
   await expect(page.locator('[part~="label"]')).toHaveText("Listing the tasks");
-  await expect(page.locator('[role="status"]')).toHaveText("Listing the tasks");
+  await expect(page.locator('[role="status"]')).toHaveText(
+    "Working Listing the tasks",
+  );
   await page.evaluate(() =>
     (window as unknown as { finish: () => void }).finish(),
   );
