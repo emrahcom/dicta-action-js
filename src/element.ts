@@ -6,6 +6,15 @@ import { type Reply, RoundClient } from "./round.ts";
 
 type View = "working" | "question" | "confirmation" | "stop" | "error" | "info";
 
+// A running user request (contract-protocol.md, Request body).
+type Request = {
+  text: string;
+  requestId?: string;
+  exchange: unknown[];
+  // The text of the open question.
+  question?: string;
+};
+
 // The element's own strings (specs/architecture.md, Strings).
 const STRINGS = {
   continue: "Continue",
@@ -103,7 +112,7 @@ export class DictaAction extends HTMLElement {
   // Announces to screen readers, separate from the visible parts.
   #announcer: HTMLDivElement;
   // The running request; a response for another one is ignored.
-  #request: object | undefined;
+  #request: Request | undefined;
   // Kept between requests, so its token is kept too.
   #client: RoundClient | undefined;
   #clientFor:
@@ -157,20 +166,31 @@ export class DictaAction extends HTMLElement {
 
   submit(text: string) {
     const trimmed = text.trim();
-    if (trimmed === "" || this.#request !== undefined) {
+    if (trimmed === "") {
       return;
     }
-    void this.#run(trimmed);
+    const request = this.#request;
+    if (request === undefined) {
+      this.#hideNotice();
+      this.#request = { text: trimmed, exchange: [] };
+      void this.#round(this.#request);
+    } else if (request.question !== undefined) {
+      this.#answer(request, trimmed);
+    }
+    // Otherwise the request is running; added text comes in its own task.
   }
 
-  async #run(text: string) {
-    const request = {};
-    this.#request = request;
-    this.#hideNotice();
+  // Sends the next round of the request and acts on its reply.
+  async #round(request: Request) {
     this.#showWorking();
+    let requestId: string;
     let reply: Reply;
     try {
-      ({ reply } = await this.#roundClient().send({ text, exchange: [] }));
+      ({ requestId, reply } = await this.#roundClient().send({
+        requestId: request.requestId,
+        text: request.text,
+        exchange: request.exchange,
+      }));
     } catch (err) {
       if (this.#request === request) {
         this.#fail(err);
@@ -180,9 +200,14 @@ export class DictaAction extends HTMLElement {
     if (this.#request !== request) {
       return;
     }
-    this.#request = undefined;
+    request.requestId = requestId;
     switch (reply.type) {
+      case "question":
+        request.question = reply.text;
+        this.#showQuestion(request, reply.text, reply.options ?? []);
+        break;
       case "done":
+        this.#request = undefined;
         this.#hideView();
         if (reply.text) {
           this.#showNotice(reply.text);
@@ -190,12 +215,23 @@ export class DictaAction extends HTMLElement {
         break;
       case "stop":
       case "info":
+        this.#request = undefined;
         this.#showEnd(reply.type, reply.text);
         break;
       default:
-        // Plans and questions come in their own tasks.
+        // Plans come in their own task.
         this.#fail(new Error(`${reply.type} replies are not supported yet`));
     }
+  }
+
+  #answer(request: Request, answer: string) {
+    const question = request.question;
+    if (question === undefined || this.#request !== request) {
+      return;
+    }
+    request.question = undefined;
+    request.exchange.push({ question, answer });
+    void this.#round(request);
   }
 
   #roundClient() {
@@ -263,6 +299,27 @@ export class DictaAction extends HTMLElement {
     ]);
   }
 
+  #showQuestion(request: Request, text: string, options: string[]) {
+    const element = document.createElement("div");
+    element.className = "text";
+    element.part.add("text");
+    element.textContent = text;
+    const buttons = options.map((option) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.part.add("option");
+      button.textContent = option;
+      button.addEventListener("click", () => this.#answer(request, option));
+      return button;
+    });
+    this.#setView("question", [
+      element,
+      ...buttons,
+      this.#button("cancel", () => this.#cancel()),
+    ]);
+    this.#announce(text);
+  }
+
   #showEnd(view: "stop" | "error" | "info", text: string) {
     const element = document.createElement("div");
     element.className = "text";
@@ -286,7 +343,9 @@ export class DictaAction extends HTMLElement {
     this.#internals.states.clear();
     this.#internals.states.add(view);
     if (hadFocus) {
-      this.#view.querySelector<HTMLButtonElement>("button")?.focus();
+      this.#view
+        .querySelector<HTMLButtonElement>('[part~="cancel"], [part~="close"]')
+        ?.focus();
     }
   }
 

@@ -57,3 +57,14 @@ export function submit(page: Page, text: string) {
     text,
   );
 }
+
+// Answers the rounds with the given replies in order, and records each body.
+export async function replies(page: Page, ...list: unknown[]) {
+  const bodies: Record<string, unknown>[] = [];
+  await page.route(ROUND, (route) => {
+    bodies.push(route.request().postDataJSON() as Record<string, unknown>);
+    const reply = list.shift() ?? { type: "stop", text: "No more replies." };
+    return route.fulfill({ json: { requestId: "r1", reply } });
+  });
+  return bodies;
+}
