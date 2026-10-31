@@ -58,7 +58,8 @@ input.addEventListener("dicta-text", (e) => action.submit(e.detail.text));
 CSS parts let the integrator style or hide each part of the element:
 
 - `label`: the plan's label and the progress indicator.
-- `message`: the text of a question, a done, a stop, an info or an error.
+- `message`: the text of a question, a done with a text, a stop, an info or an
+  error.
 - `option`: each option button of a question.
 - `confirm`: the confirmation texts.
 - `continue`, `cancel`, `close`: the buttons.
@@ -105,7 +106,8 @@ The element shows little: the user wants the task done, not to read.
   without the plan's label (`contract-plan.md`, Confirmation), and Continue next
   to Cancel. For a `forEach`, the number of items and the first three items.
 - Done with a text: shown for 5 seconds, then it goes away. Done without a text:
-  nothing is shown; the progress indicator goes away.
+  nothing is shown; the progress indicator goes away. A done never waits for a
+  click.
 - A stop and an error: shown until the user closes them or submits new text.
 - An info: shown with its paragraphs until the user closes it
   (`contract-protocol.md`, Response body).
