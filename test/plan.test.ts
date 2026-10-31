@@ -28,7 +28,7 @@ const CONTEXT: SiteContext = {
           title: { type: "string" },
           priority: { type: "integer" },
           tags: { type: "array", items: { type: "string" } },
-          color: { enum: ["red", "green"] },
+          color: { enum: ["red", "green", "$red", "$$green"] },
         },
         required: ["title"],
       },
@@ -97,6 +97,10 @@ const VALID: [string, unknown][] = [
     { steps: [list, create({ title: "a", priority: "$1.length" })] },
   ],
   ["$$ as a plain string", { steps: [create({ title: "$$5 lunch" })] }],
+  [
+    "a $$ string whose single-$ value is in the enum",
+    { steps: [create({ title: "a", color: "$$red" })] },
+  ],
   [
     "a required argument named like an inherited one",
     { steps: [{ call: "tasks.tag", args: { constructor: "x" } }] },
@@ -275,6 +279,11 @@ const INVALID: [string, unknown, RegExp][] = [
   [
     "a value outside the enum",
     { steps: [create({ title: "a", color: "blue" })] },
+    /color is not one of/,
+  ],
+  [
+    "a $$ string whose single-$ value is not in the enum",
+    { steps: [create({ title: "a", color: "$$green" })] },
     /color is not one of/,
   ],
   [

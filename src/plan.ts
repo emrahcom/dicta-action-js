@@ -126,10 +126,16 @@ function matches(
   if (schema.type !== undefined && !hasType(value, schema.type)) {
     throw new Error(`${path} must be of type ${schema.type}`);
   }
+  // Before references are filled in, a string written with $$ is compared as
+  // the capability gets it, with a single $ (contract-plan.md, References).
+  const literal =
+    references && typeof value === "string" && value.startsWith("$$")
+      ? value.slice(1)
+      : value;
   if (
     schema.enum !== undefined &&
     !schema.enum.some(
-      (option) => JSON.stringify(option) === JSON.stringify(value),
+      (option) => JSON.stringify(option) === JSON.stringify(literal),
     )
   ) {
     throw new Error(`${path} is not one of the allowed values`);

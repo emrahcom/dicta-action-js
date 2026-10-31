@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { CapabilityModule } from "../src/index.ts";
-import type { Plan } from "../src/plan.ts";
+import { buildContext } from "../src/context.ts";
+import { checkPlan, type Plan } from "../src/plan.ts";
 import {
   type Confirmation,
   newProgress,
@@ -143,6 +144,27 @@ test("references are filled in with their JSON type", async () => {
 test("$$ is passed on with a single $", async () => {
   await run({ steps: [{ call: "tasks.update", args: { id: "$$5" } }] });
   assert.deepEqual(calls[0], ["tasks.update", { id: "$5" }]);
+});
+
+test("a $$ string passes an enum of its single-$ value", async () => {
+  const using = moduleWith({
+    "prices.set": {
+      level: "read",
+      desc: "Sets the currency.",
+      args: {
+        type: "object",
+        properties: { currency: { enum: ["$USD"] } },
+      },
+      run: recorder("prices.set", () => null),
+    },
+  });
+  const plan = {
+    steps: [{ call: "prices.set", args: { currency: "$$USD" } }],
+  };
+  checkPlan(plan, buildContext(using));
+  const report = await run(plan, using);
+  assert.deepEqual(report, {});
+  assert.deepEqual(calls[0], ["prices.set", { currency: "$USD" }]);
 });
 
 test("a filled-in value is checked again", async () => {
