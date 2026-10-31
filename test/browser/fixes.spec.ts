@@ -3,32 +3,25 @@ import { openPage, replies, submit } from "./page.ts";
 
 const notice = '[part~="notice"]';
 
-test("a notice hidden under the pointer does not keep the next one", async ({
+test("the pointer over one notice does not keep the next one", async ({
   page,
 }) => {
   await page.clock.install();
   await replies(
     page,
     { type: "done", text: "First." },
-    { type: "stop", text: "No." },
     { type: "done", text: "Second." },
   );
   await openPage(page, '<dicta-action notice-duration="1"></dicta-action>');
   await submit(page, "a");
   await page.locator(notice).hover();
-  // A new request hides the notice while the pointer is over it.
   await submit(page, "b");
-  await page.getByRole("button", { name: "Close" }).click();
-  await page.mouse.move(0, 0);
-  await submit(page, "c");
-  await expect(page.locator(notice)).toHaveText("Second.");
+  await expect(page.locator(notice)).toHaveText(["First.", "Second."]);
   await page.clock.runFor(1100);
-  await expect(page.locator(notice)).toBeHidden();
+  await expect(page.locator(notice)).toHaveText(["First."]);
 });
 
-test("a notice hidden with the focus does not keep the next one", async ({
-  page,
-}) => {
+test("the focus on one notice does not keep the next one", async ({ page }) => {
   await page.clock.install();
   await replies(
     page,
@@ -39,9 +32,9 @@ test("a notice hidden with the focus does not keep the next one", async ({
   await submit(page, "a");
   await page.locator(notice).focus();
   await submit(page, "b");
-  await expect(page.locator(notice)).toHaveText("Second.");
+  await expect(page.locator(notice)).toHaveText(["First.", "Second."]);
   await page.clock.runFor(1100);
-  await expect(page.locator(notice)).toBeHidden();
+  await expect(page.locator(notice)).toHaveText(["First."]);
 });
 
 test("an equal text is announced again", async ({ page }) => {

@@ -189,7 +189,7 @@ test("a failed round while leaving is an error when the page stays", async ({
   // A page load that starts and is called off, as by a "leave page?" prompt.
   await page.evaluate(() => dispatchEvent(new Event("beforeunload")));
   await submit(page, "a");
-  await expect(page.locator('[part~="text"]')).toHaveText(
+  await expect(page.locator('[part~="notice"]')).toHaveText(
     "Something went wrong",
   );
 });
@@ -227,11 +227,15 @@ test("after Stay at the leave prompt text is ignored until Cancel", async ({
   page.on("dialog", (dialog) => void dialog.dismiss());
   await submit(page, "go");
   await expect.poll(() => bodies.length).toBe(1);
-  await expect(page.locator('[part~="indicator"]')).toBeVisible();
-  await submit(page, "and more");
-  await expect(page.locator('[part~="notice"]')).toHaveText(
+  // The working view's label says why text is ignored.
+  await expect(page.locator('[part~="label"]')).toHaveText(
     "Wait for the page to load",
   );
+  await expect(page.locator('[role="status"]')).toContainText(
+    "Wait for the page to load",
+  );
+  await submit(page, "and more");
+  await expect(page.locator('[part~="notice"]')).toHaveCount(0);
   // The plan does not go on and no round is sent.
   await page.waitForTimeout(300);
   expect(bodies.length).toBe(1);

@@ -18,7 +18,7 @@ import {
 } from "./run.ts";
 import { saveRequest, takeSaved } from "./saved.ts";
 
-type View = "working" | "question" | "confirmation" | "stop" | "error" | "info";
+type View = "working" | "question" | "confirmation";
 
 // Where a running request is: waiting for the server, a question open, a plan
 // running, a confirmation open in that plan, or waiting for the page to be
@@ -65,6 +65,8 @@ const STRINGS = {
   // Announced only, never shown (specs/architecture.md, Accessibility).
   done: "Done",
   error: "Something went wrong",
+  // Announced only, never shown.
+  info: "New information",
   items: "{count} items",
   pageLoad: "Wait for the page to load",
   tooLong: "The text is too long",
@@ -74,6 +76,10 @@ const STRINGS = {
 type StringKey = keyof typeof STRINGS;
 
 const DEFAULT_NOTICE_SECONDS = 5;
+// The most notices shown at once.
+const MAX_NOTICES = 3;
+// The reading time of a notice: one second for every this many words.
+const WORDS_PER_SECOND = 3;
 // The longest text taken, in Unicode code points (contract-protocol.md,
 // Limits).
 const MAX_TEXT_CHARS = 10000;
@@ -86,6 +92,11 @@ const STYLE = `
   }
   [hidden] {
     display: none !important;
+  }
+  .notices {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
   }
   .view,
   .notice {
@@ -164,7 +175,10 @@ export class DictaAction extends HTMLElement {
   // Carries the custom state with the view's name, for the page's CSS.
   #internals: ElementInternals;
   #view: HTMLDivElement;
-  #notice: HTMLDivElement;
+  // The notices shown, the newest last (specs/architecture.md, Display).
+  #notices: HTMLDivElement;
+  // The notices with a Close button, which never go away by themselves.
+  #infos = new WeakSet<HTMLElement>();
   // Announces to screen readers, separate from the visible parts.
   #announcer: HTMLDivElement;
   // The running request; a response for another one is ignored.
@@ -178,13 +192,10 @@ export class DictaAction extends HTMLElement {
         getToken: (() => Promise<string>) | undefined;
       }
     | undefined;
-  #noticeTimer: ReturnType<typeof setTimeout> | undefined;
-  #noticeHovered = false;
-  #noticeFocused = false;
   #announceTimer: ReturnType<typeof setTimeout> | undefined;
   // The texts waiting to be set in the status region.
   #announcePending: string[] = [];
-  // The page element the focus came from into the view, to go back to.
+  // The page element the focus came from into the element, to go back to.
   #focusFrom: HTMLElement | undefined;
 
   static observedAttributes = ["server"];
@@ -218,38 +229,23 @@ export class DictaAction extends HTMLElement {
     this.#view.className = "view";
     this.#view.part.add("view");
     this.#view.hidden = true;
-    this.#view.addEventListener("focusin", (event) => {
-      const from = event.relatedTarget;
-      if (from instanceof HTMLElement && !this.contains(from)) {
+    this.#notices = document.createElement("div");
+    this.#notices.className = "notices";
+    root.addEventListener("focusin", (event) => {
+      const from = (event as FocusEvent).relatedTarget;
+      // Only a page element outside counts, not one in the shadow root.
+      if (
+        from instanceof HTMLElement &&
+        !this.contains(from) &&
+        !root.contains(from)
+      ) {
         this.#focusFrom = from;
       }
-    });
-    this.#notice = document.createElement("div");
-    this.#notice.className = "notice";
-    this.#notice.part.add("notice");
-    this.#notice.tabIndex = 0;
-    this.#notice.hidden = true;
-    // The notice stays while the pointer is over it or it has focus.
-    this.#notice.addEventListener("pointerenter", () => {
-      this.#noticeHovered = true;
-      clearTimeout(this.#noticeTimer);
-    });
-    this.#notice.addEventListener("pointerleave", () => {
-      this.#noticeHovered = false;
-      this.#startNoticeTime();
-    });
-    this.#notice.addEventListener("focus", () => {
-      this.#noticeFocused = true;
-      clearTimeout(this.#noticeTimer);
-    });
-    this.#notice.addEventListener("blur", () => {
-      this.#noticeFocused = false;
-      this.#startNoticeTime();
     });
     this.#announcer = document.createElement("div");
     this.#announcer.className = "announcer";
     this.#announcer.setAttribute("role", "status");
-    root.append(style, this.#view, this.#notice, this.#announcer);
+    root.append(style, this.#view, this.#notices, this.#announcer);
   }
 
   connectedCallback() {
@@ -304,7 +300,7 @@ export class DictaAction extends HTMLElement {
     // A page the browser shows again from its back/forward cache shows no
     // request that is over.
     this.#hideView();
-    this.#hideNotice();
+    this.#notices.replaceChildren();
   };
 
   // A page shown again from the back/forward cache does not start again, so
@@ -378,16 +374,16 @@ export class DictaAction extends HTMLElement {
       return;
     }
     if (Array.from(trimmed).length > MAX_TEXT_CHARS) {
-      this.#showNotice(this.#string("tooLong"));
+      this.#addNotice(this.#string("tooLong"));
       return;
     }
     const request = this.#request;
     if (request?.pageLoad) {
-      // From the start of a page load until the page is left, text is ignored
-      // (contract-protocol.md, Page changes).
-      this.#showNotice(this.#string("pageLoad"));
-    } else if (request === undefined) {
-      this.#hideNotice();
+      // From the start of a page load until the page is left, text is ignored;
+      // the working view says why (contract-protocol.md, Page changes).
+      return;
+    }
+    if (request === undefined) {
       this.#request = {
         text: trimmed,
         exchange: [],
@@ -484,15 +480,17 @@ export class DictaAction extends HTMLElement {
     if (reply.type !== "plan" && reply.type !== "question") {
       this.#store(request, { type: reply.type, text: reply.text });
     }
-    if (reply.type === "done") {
-      this.#hideView();
-      if (reply.text) {
-        this.#showNotice(reply.text);
-      } else {
-        this.#announce(this.#string("done"));
-      }
-    } else if (reply.type === "stop" || reply.type === "info") {
-      this.#showEnd(reply.type, reply.text);
+    if (reply.type === "plan" || reply.type === "question") {
+      return;
+    }
+    // The outcome is a notice; a new request does not hide it.
+    this.#hideView();
+    if (reply.type === "info") {
+      this.#addNotice(reply.text, true);
+    } else if (reply.text) {
+      this.#addNotice(reply.text);
+    } else {
+      this.#announce(this.#string("done"));
     }
   }
 
@@ -551,6 +549,9 @@ export class DictaAction extends HTMLElement {
     if (request.pageLoad) {
       // The report waits, with the working view, for the page to be left.
       request.phase = "pageLoad";
+      const label = this.#string("pageLoad");
+      this.#showWorking(label);
+      this.#announce(label);
       return;
     }
     // Text that came after the last step follows the report without a halt.
@@ -609,7 +610,8 @@ export class DictaAction extends HTMLElement {
     console.error(
       `dicta-action: ${err instanceof Error ? err.message : String(err)}`,
     );
-    this.#showEnd("error", this.#string("error"));
+    this.#hideView();
+    this.#addNotice(this.#string("error"));
   }
 
   // Ends the request. While a plan runs, the running step finishes first and
@@ -741,20 +743,8 @@ export class DictaAction extends HTMLElement {
     this.#announce(text);
   }
 
-  #showEnd(view: "stop" | "error" | "info", text: string) {
-    const element = document.createElement("div");
-    element.className = "text";
-    element.part.add("text");
-    element.textContent = text;
-    this.#setView(view, [
-      element,
-      this.#button("close", () => this.#hideView()),
-    ]);
-    this.#announce(text);
-  }
-
   // Shows a view in place of the one shown. When the focus was in the old
-  // view, it moves to the new view's Cancel or Close.
+  // view, it moves to the new view's Cancel.
   #setView(view: View, children: HTMLElement[]) {
     const hadFocus = this.#view.contains(
       this.shadowRoot?.activeElement ?? null,
@@ -764,9 +754,7 @@ export class DictaAction extends HTMLElement {
     this.#internals.states.clear();
     this.#internals.states.add(view);
     if (hadFocus) {
-      this.#view
-        .querySelector<HTMLButtonElement>('[part~="cancel"], [part~="close"]')
-        ?.focus();
+      this.#view.querySelector<HTMLButtonElement>('[part~="cancel"]')?.focus();
     }
   }
 
@@ -780,44 +768,103 @@ export class DictaAction extends HTMLElement {
     this.#view.replaceChildren();
     this.#internals.states.clear();
     if (hadFocus) {
-      const from = this.#focusFrom;
-      if (from?.isConnected) {
-        from.focus();
-      }
-      if (!from?.matches(":focus")) {
-        this.tabIndex = -1;
-        this.focus();
-      }
+      this.#returnFocus();
     }
   }
 
-  #showNotice(text: string) {
-    this.#notice.textContent = text;
-    this.#notice.hidden = false;
-    this.#announce(text);
-    this.#startNoticeTime();
+  // Gives the focus back to the page element it came from into the element,
+  // or to the element itself when that one is gone.
+  #returnFocus() {
+    const from = this.#focusFrom;
+    if (from?.isConnected) {
+      from.focus();
+    }
+    if (!from?.matches(":focus")) {
+      this.tabIndex = -1;
+      this.focus();
+    }
   }
 
-  #hideNotice() {
-    clearTimeout(this.#noticeTimer);
-    this.#notice.hidden = true;
-    this.#notice.textContent = "";
-    // A hidden notice does not reliably get blur (Firefox, WebKit) or
-    // pointerleave.
-    this.#noticeHovered = false;
-    this.#noticeFocused = false;
+  // Shows a notice after the ones shown. An info has its paragraphs and Close
+  // and stays until closed; any other notice goes away by itself. With more
+  // than three, the oldest that goes away by itself goes first.
+  #addNotice(text: string, info = false) {
+    const notice = document.createElement("div");
+    notice.className = "notice";
+    notice.part.add("notice");
+    notice.tabIndex = 0;
+    if (info) {
+      const element = document.createElement("div");
+      element.className = "text";
+      element.textContent = text;
+      notice.append(
+        element,
+        this.#button("close", () => this.#removeNotice(notice)),
+      );
+      this.#infos.add(notice);
+      // An info can be long: only the info string is announced.
+      this.#announce(this.#string("info"));
+    } else {
+      notice.textContent = text;
+      this.#timeNotice(notice, text);
+      this.#announce(text);
+    }
+    const shown = Array.from(this.#notices.children) as HTMLElement[];
+    if (shown.length >= MAX_NOTICES) {
+      const oldest = shown.find((element) => !this.#infos.has(element));
+      if (oldest) {
+        this.#removeNotice(oldest);
+      }
+    }
+    this.#notices.append(notice);
   }
 
-  // Starts the notice's time again, unless the pointer or the focus is on it.
-  #startNoticeTime() {
-    clearTimeout(this.#noticeTimer);
-    if (this.#notice.hidden || this.#noticeHovered || this.#noticeFocused) {
+  // A notice that goes away by itself: after notice-duration or its reading
+  // time, whichever is longer. While the pointer is over it or it has focus,
+  // it stays, and the time starts again when they leave.
+  #timeNotice(notice: HTMLElement, text: string) {
+    const words = text.split(/\s+/).filter(Boolean).length;
+    const ms =
+      Math.max(this.#noticeSeconds(), Math.ceil(words / WORDS_PER_SECOND)) *
+      1000;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let hovered = false;
+    let focused = false;
+    const start = () => {
+      clearTimeout(timer);
+      if (!hovered && !focused) {
+        timer = setTimeout(() => this.#removeNotice(notice), ms);
+      }
+    };
+    notice.addEventListener("pointerenter", () => {
+      hovered = true;
+      start();
+    });
+    notice.addEventListener("pointerleave", () => {
+      hovered = false;
+      start();
+    });
+    notice.addEventListener("focus", () => {
+      focused = true;
+      start();
+    });
+    notice.addEventListener("blur", () => {
+      focused = false;
+      start();
+    });
+    start();
+  }
+
+  // Removes a notice. When the focus was in it, it goes back (#returnFocus).
+  #removeNotice(notice: HTMLElement) {
+    if (!notice.isConnected) {
       return;
     }
-    this.#noticeTimer = setTimeout(
-      () => this.#hideNotice(),
-      this.#noticeSeconds() * 1000,
-    );
+    const hadFocus = notice.contains(this.shadowRoot?.activeElement ?? null);
+    notice.remove();
+    if (hadFocus) {
+      this.#returnFocus();
+    }
   }
 
   #noticeSeconds() {

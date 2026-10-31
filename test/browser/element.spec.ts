@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { holdRounds, openPage, reply, ROUND, submit } from "./page.ts";
+import { holdRounds, openPage, replies, reply, ROUND, submit } from "./page.ts";
 
 const view = '[part~="view"]';
 const notice = '[part~="notice"]';
@@ -143,36 +143,87 @@ test("a done without a text shows nothing", async ({ page }) => {
   await expect(page.locator(notice)).toBeHidden();
 });
 
-test("a stop shows its text until Close", async ({ page }) => {
+test("a stop is a notice that goes away", async ({ page }) => {
+  await page.clock.install();
   await reply(page, { type: "stop", text: "Not about this site." });
-  await openPage(page);
+  await openPage(page, '<dicta-action notice-duration="1"></dicta-action>');
   await submit(page, "a");
-  await expect(page.locator('[part~="text"]')).toHaveText(
-    "Not about this site.",
-  );
-  expect(
-    await page.evaluate(() =>
-      document.querySelector("dicta-action")?.matches(":state(stop)"),
-    ),
-  ).toBe(true);
-  await page.getByRole("button", { name: "Close" }).click();
+  await expect(page.locator(notice)).toHaveText("Not about this site.");
   await expect(page.locator(view)).toBeHidden();
+  await page.clock.runFor(1100);
+  await expect(page.locator(notice)).toHaveCount(0);
 });
 
-test("an info keeps its paragraphs", async ({ page }) => {
-  await reply(page, { type: "info", text: "First.\n\nSecond." });
-  await openPage(page);
+test("a long notice stays for its reading time", async ({ page }) => {
+  await page.clock.install();
+  // 30 words: 10 seconds, longer than notice-duration.
+  const text = Array.from({ length: 30 }, () => "word").join(" ");
+  await reply(page, { type: "stop", text });
+  await openPage(page, '<dicta-action notice-duration="1"></dicta-action>');
   await submit(page, "a");
-  const text = page.locator('[part~="text"]');
+  await expect(page.locator(notice)).toBeVisible();
+  await page.clock.runFor(9900);
+  await expect(page.locator(notice)).toBeVisible();
+  await page.clock.runFor(200);
+  await expect(page.locator(notice)).toHaveCount(0);
+});
+
+test("an info keeps its paragraphs and stays until Close", async ({ page }) => {
+  await page.clock.install();
+  await reply(page, { type: "info", text: "First.\n\nSecond." });
+  await openPage(page, '<dicta-action notice-duration="1"></dicta-action>');
+  await submit(page, "a");
+  const text = page.locator(`${notice} .text`);
   await expect(text).toHaveText("First.\n\nSecond.", { useInnerText: true });
   await expect(text).toHaveCSS("white-space", "pre-line");
+  // Only the info string is announced, not the text.
+  await expect(page.locator(status)).toHaveText("Working New information");
+  await page.clock.runFor(60_000);
+  await expect(page.locator(notice)).toBeVisible();
+  await page.getByRole("button", { name: "Close" }).click();
+  await expect(page.locator(notice)).toHaveCount(0);
 });
 
 test("texts are shown as plain text", async ({ page }) => {
   await reply(page, { type: "stop", text: "<b>bold</b>" });
   await openPage(page);
   await submit(page, "a");
-  await expect(page.locator('[part~="text"]')).toHaveText("<b>bold</b>");
+  await expect(page.locator(notice)).toHaveText("<b>bold</b>");
+});
+
+test("at most three notices, never dropping an info", async ({ page }) => {
+  await replies(
+    page,
+    { type: "info", text: "Help." },
+    { type: "stop", text: "One." },
+    { type: "stop", text: "Two." },
+    { type: "stop", text: "Three." },
+  );
+  await openPage(page);
+  for (const text of ["a", "b", "c", "d"]) {
+    await submit(page, text);
+    await expect(page.locator('[part~="indicator"]')).toHaveCount(0);
+  }
+  await expect(page.locator(notice)).toHaveText([
+    "Help.Close",
+    "Two.",
+    "Three.",
+  ]);
+});
+
+test("a stop stays beside the working view of the next request", async ({
+  page,
+}) => {
+  const routes = await holdRounds(page);
+  await openPage(page);
+  await submit(page, "a");
+  await submit(page, "b");
+  await expect.poll(() => routes.length).toBe(1);
+  await routes[0].fulfill({
+    json: { requestId: "r1", reply: { type: "stop", text: "No." } },
+  });
+  await expect(page.locator('[part~="indicator"]')).toBeVisible();
+  await expect(page.locator(notice)).toHaveText("No.");
 });
 
 test("an HTTP error shows the error view and logs the cause", async ({
@@ -185,21 +236,23 @@ test("an HTTP error shows the error view and logs the cause", async ({
   );
   await openPage(page);
   await submit(page, "a");
-  await expect(page.locator('[part~="text"]')).toHaveText(
-    "Something went wrong",
-  );
-  expect(
-    await page.evaluate(() =>
-      document.querySelector("dicta-action")?.matches(":state(error)"),
-    ),
-  ).toBe(true);
+  await expect(page.locator(notice)).toHaveText("Something went wrong");
+  await expect(page.locator(view)).toBeHidden();
   expect(logs.some((log) => log.includes("HTTP 400: context: too large"))).toBe(
     true,
   );
 });
 
 test("strings override the element's own texts", async ({ page }) => {
-  await page.route(ROUND, (route) => route.fulfill({ status: 500, json: {} }));
+  let rounds = 0;
+  await page.route(ROUND, (route) => {
+    rounds += 1;
+    return rounds === 1
+      ? route.fulfill({ status: 500, json: {} })
+      : route.fulfill({
+          json: { requestId: "r1", reply: { type: "info", text: "Hilfe." } },
+        });
+  });
   await openPage(page);
   await page.evaluate(() =>
     Object.assign(document.querySelector("dicta-action")!, {
@@ -212,17 +265,18 @@ test("strings override the element's own texts", async ({ page }) => {
     }),
   );
   await submit(page, "a");
-  await expect(page.locator('[part~="text"]')).toHaveText("Fehler");
+  await expect(page.locator(notice)).toHaveText("Fehler");
+  await submit(page, "b");
   await expect(page.getByRole("button", { name: "Schliessen" })).toBeVisible();
 });
 
 test("the page styles a part in one view with the state", async ({ page }) => {
-  await reply(page, { type: "stop", text: "No." });
+  await reply(page, { type: "question", text: "When?" });
   await openPage(
     page,
     `<style>
-      dicta-action:state(stop)::part(view) { color: rgb(255, 0, 0); }
-      dicta-action:state(info)::part(view) { color: rgb(0, 128, 0); }
+      dicta-action:state(question)::part(view) { color: rgb(255, 0, 0); }
+      dicta-action:state(working)::part(view) { color: rgb(0, 128, 0); }
     </style>
     <dicta-action></dicta-action>`,
   );
@@ -255,7 +309,7 @@ test("the status region announces a notice", async ({ page }) => {
   await expect(page.locator(status)).toHaveText("Working Moved 2 tasks.");
 });
 
-test("the focus moves from Cancel to the next view's Close", async ({
+test("the focus goes to the element when a stop ends the request", async ({
   page,
 }) => {
   const routes = await holdRounds(page);
@@ -266,15 +320,15 @@ test("the focus moves from Cancel to the next view's Close", async ({
   await routes[0].fulfill({
     json: { requestId: "r1", reply: { type: "stop", text: "No." } },
   });
-  await expect(page.getByRole("button", { name: "Close" })).toBeFocused();
+  await expect(page.locator("dicta-action")).toBeFocused();
 });
 
 test("a new view does not take the focus from the page", async ({ page }) => {
-  await reply(page, { type: "stop", text: "No." });
+  await reply(page, { type: "question", text: "When?" });
   await openPage(page, "<input><dicta-action></dicta-action>");
   await page.locator("input").focus();
   await submit(page, "a");
-  await expect(page.getByRole("button", { name: "Close" })).toBeVisible();
+  await expect(page.locator('[part~="text"]')).toHaveText("When?");
   await expect(page.locator("input")).toBeFocused();
 });
 
@@ -294,14 +348,16 @@ test("Cancel gives the focus back to the site's text field", async ({
   await expect(page.locator("input")).toBeFocused();
 });
 
-test("Close gives the focus back to the site's text field", async ({
+test("Close on an info gives the focus back to the text field", async ({
   page,
 }) => {
-  await reply(page, { type: "stop", text: "No." });
+  await reply(page, { type: "info", text: "Like this." });
   await openPage(page, "<input><dicta-action></dicta-action>");
   await page.locator("input").focus();
   await submit(page, "a");
   await expect(page.getByRole("button", { name: "Close" })).toBeVisible();
+  // The info notice first, then its Close.
+  await page.keyboard.press("Tab");
   await page.keyboard.press("Tab");
   await expect(page.getByRole("button", { name: "Close" })).toBeFocused();
   await page.keyboard.press("Enter");

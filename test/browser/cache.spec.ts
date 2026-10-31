@@ -21,19 +21,18 @@ test("pagehide hides the view of a request that is over", async ({ page }) => {
   });
 });
 
-test("pagehide hides a stop view and a notice", async ({ page }) => {
-  await replies(page, { type: "stop", text: "No." });
+test("pagehide hides the notices", async ({ page }) => {
+  await replies(
+    page,
+    { type: "stop", text: "No." },
+    { type: "info", text: "Like this." },
+  );
   await openPage(page);
   await submit(page, "a");
-  await expect(page.locator('[part~="text"]')).toHaveText("No.");
-  await fire(page, "pagehide");
-  await expect(page.locator('[part~="view"]')).toBeHidden();
-  await page.unrouteAll();
-  await replies(page, { type: "done", text: "Done it." });
   await submit(page, "b");
-  await expect(page.locator('[part~="notice"]')).toHaveText("Done it.");
+  await expect(page.locator('[part~="notice"]')).toHaveCount(2);
   await fire(page, "pagehide");
-  await expect(page.locator('[part~="notice"]')).toBeHidden();
+  await expect(page.locator('[part~="notice"]')).toHaveCount(0);
 });
 
 test("after pagehide a failed round is an error at once", async ({ page }) => {
@@ -43,7 +42,7 @@ test("after pagehide a failed round is an error at once", async ({ page }) => {
   await fire(page, "pagehide");
   await submit(page, "a");
   // Well under the one second a leaving page waits.
-  await expect(page.locator('[part~="text"]')).toHaveText(
+  await expect(page.locator('[part~="notice"]')).toHaveText(
     "Something went wrong",
     { timeout: 500 },
   );

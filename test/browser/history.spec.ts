@@ -43,9 +43,11 @@ test("stops and infos are stored newest first", async ({ page }) => {
   );
   await openPage(page);
   await submit(page, "a");
-  await expect(page.locator('[part~="text"]')).toHaveText("No.");
+  await expect(page.locator('[part~="notice"]').last()).toHaveText("No.");
   await submit(page, "b");
-  await expect(page.locator('[part~="text"]')).toHaveText("Like this.");
+  await expect(page.locator('[part~="notice"]').last()).toContainText(
+    "Like this.",
+  );
   await submit(page, "c");
   await expect.poll(async () => (await history(page)).length).toBe(3);
   expect((await history(page)).map((e) => e.outcome)).toEqual([
@@ -69,7 +71,7 @@ test("an error in a later round is stored", async ({ page }) => {
   await submit(page, "a");
   await expect(page.locator('[part~="text"]')).toHaveText("When?");
   await submit(page, "now");
-  await expect(page.locator('[part~="text"]')).toHaveText(
+  await expect(page.locator('[part~="notice"]')).toHaveText(
     "Something went wrong",
   );
   const [entry] = await history(page);
@@ -85,7 +87,7 @@ test("a request without a requestId is not stored", async ({ page }) => {
   );
   await openPage(page);
   await submit(page, "a");
-  await expect(page.locator('[part~="text"]')).toHaveText(
+  await expect(page.locator('[part~="notice"]')).toHaveText(
     "Something went wrong",
   );
   const routes = await holdRounds(page);
