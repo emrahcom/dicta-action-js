@@ -50,9 +50,13 @@ const STRINGS = {
   continue: "Continue",
   cancel: "Cancel",
   close: "Close",
+  // Announced only, never shown (specs/architecture.md, Accessibility).
+  done: "Done",
   error: "Something went wrong",
   items: "{count} items",
   tooLong: "The text is too long",
+  // Announced only, never shown.
+  working: "Working",
 };
 type StringKey = keyof typeof STRINGS;
 
@@ -305,6 +309,7 @@ export class DictaAction extends HTMLElement {
       return;
     }
     this.#request = request;
+    this.#announce(this.#string("working"));
     void this.#round(request);
   }
 
@@ -321,6 +326,7 @@ export class DictaAction extends HTMLElement {
     if (request === undefined) {
       this.#hideNotice();
       this.#request = { text: trimmed, exchange: [], added: [] };
+      this.#announce(this.#string("working"));
       void this.#round(this.#request);
     } else if (request.question !== undefined) {
       this.#answer(request, trimmed);
@@ -411,6 +417,8 @@ export class DictaAction extends HTMLElement {
       this.#hideView();
       if (reply.text) {
         this.#showNotice(reply.text);
+      } else {
+        this.#announce(this.#string("done"));
       }
     } else if (reply.type === "stop" || reply.type === "info") {
       this.#showEnd(reply.type, reply.text);
