@@ -23,9 +23,9 @@ the repo.
 
 - ES modules with no runtime dependencies, written in TypeScript and compiled to
   JavaScript for the browser.
-- Published to npm as `dicta-action-js`, holding `dist/` with type declarations.
-  The capability module imports `dictaCapabilities` from it, so the site bundles
-  both into its pages.
+- Published to npm as `dicta-action-js`, with the compiled JavaScript and its
+  TypeScript type declarations. The capability module imports
+  `dictaCapabilities` from it, so the site bundles both into its pages.
 - Importing the package defines `<dicta-action>`, a custom element, so it works
   in any page and with any UI framework. Its markup and styles live in a shadow
   root, so the page's styles do not break it.
