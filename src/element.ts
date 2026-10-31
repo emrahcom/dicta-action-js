@@ -14,6 +14,7 @@ import {
   type Report,
   reportSoFar,
   runPlan,
+  STOP_MESSAGES,
 } from "./run.ts";
 import { saveRequest, takeSaved } from "./saved.ts";
 
@@ -303,7 +304,7 @@ export class DictaAction extends HTMLElement {
       // A report not sent yet goes into the history too.
       request.exchange.push({
         plan,
-        report: reportSoFar(progress, "cancelled", "Cancelled"),
+        report: reportSoFar(progress, "cancelled", STOP_MESSAGES.cancelled),
       });
     }
     this.#store(request, { type: "cancelled" });

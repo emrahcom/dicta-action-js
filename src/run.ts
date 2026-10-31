@@ -57,7 +57,7 @@ export function cut(message: string) {
     : message;
 }
 
-function bytes(value: unknown) {
+export function bytes(value: unknown) {
   return new TextEncoder().encode(JSON.stringify(value) ?? "null").length;
 }
 
@@ -164,19 +164,21 @@ export type Confirmation = { items: string[][]; count?: number };
 // Asks the user; true is Continue, false is Cancel.
 type Ask = (confirmation: Confirmation) => Promise<boolean>;
 
-class Cancelled extends Error {}
-
-// A forEach stopped between items; its halt is already set.
+// The plan stops early, by added text or cancel; its halt is already set.
 class Stopped extends Error {}
 
 // Why a plan stops early at the next step or item: added text or cancel
 // (contract-protocol.md, Added text and cancel).
 export type Stop = "interrupted" | "cancelled";
 
-const STOP_MESSAGES: Record<Stop, string> = {
+export const STOP_MESSAGES: Record<Stop, string> = {
   interrupted: "The user added text",
   cancelled: "Cancelled",
 };
+
+function stopHalt(step: number, code: Stop): Halt {
+  return { step, code, message: STOP_MESSAGES[code] };
+}
 
 const SHOWN_ITEMS = 3;
 const DEFAULT_CONFIRM_OVER = 10;
@@ -251,7 +253,7 @@ export async function runPlan(
     progress.output = undefined;
     const stopped = stop();
     if (stopped) {
-      halt = { step: number, code: stopped, message: STOP_MESSAGES[stopped] };
+      halt = stopHalt(number, stopped);
       break;
     }
     try {
@@ -261,7 +263,8 @@ export async function runPlan(
           asks(call.capability) &&
           !(await ask({ items: [[await confirmText(call)]] }))
         ) {
-          throw new Cancelled();
+          halt = stopHalt(number, "cancelled");
+          throw new Stopped();
         }
         outputs.push(await running(progress, () => execute(call)));
       } else {
@@ -298,7 +301,8 @@ export async function runPlan(
           const count =
             items.length > SHOWN_ITEMS ? { count: items.length } : {};
           if (!(await ask({ items: shown, ...count }))) {
-            throw new Cancelled();
+            halt = stopHalt(number, "cancelled");
+            throw new Stopped();
           }
         }
         const output: unknown[][] = [];
@@ -309,12 +313,7 @@ export async function runPlan(
           const itemStopped = k > 0 ? stop() : undefined;
           if (itemStopped) {
             // The items that ran are all complete, so `do` is not set.
-            halt = {
-              step: number,
-              code: itemStopped,
-              message: STOP_MESSAGES[itemStopped],
-              item: k,
-            };
+            halt = { ...stopHalt(number, itemStopped), item: k };
             if (step.includeOutput) {
               halt.outputs = output;
             }
@@ -354,10 +353,6 @@ export async function runPlan(
       }
     } catch (err) {
       if (err instanceof Stopped) {
-        break;
-      }
-      if (err instanceof Cancelled) {
-        halt = { step: number, code: "cancelled", message: "Cancelled" };
         break;
       }
       if (!(err instanceof Failure)) {

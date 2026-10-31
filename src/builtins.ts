@@ -4,9 +4,9 @@
 
 import { type HistoryEntry, readHistory } from "./history.ts";
 import type { Capability, Schema } from "./module.ts";
+import { bytes, cut } from "./run.ts";
 
 const DEFAULT_LIMIT = 10;
-const MAX_TEXT_CHARS = 200;
 const MAX_OUTPUT_BYTES = 16 * 1024;
 
 const OUTCOME: Schema = {
@@ -26,17 +26,6 @@ const ENTRY_PROPERTIES: Record<string, Schema> = {
   text: { type: "string", description: "The user's request" },
   outcome: OUTCOME,
 };
-
-function cut(text: string) {
-  const chars = Array.from(text);
-  return chars.length > MAX_TEXT_CHARS
-    ? chars.slice(0, MAX_TEXT_CHARS).join("")
-    : text;
-}
-
-function bytes(value: unknown) {
-  return new TextEncoder().encode(JSON.stringify(value) ?? "null").length;
-}
 
 // The short entry of dicta.listHistory, with texts cut to 200 characters.
 function short({ requestId, time, text, outcome }: HistoryEntry) {
