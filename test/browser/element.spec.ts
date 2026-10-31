@@ -277,3 +277,60 @@ test("a new view does not take the focus from the page", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Close" })).toBeVisible();
   await expect(page.locator("input")).toBeFocused();
 });
+
+// The focus when a view goes away and no view follows (Accessibility).
+
+test("Cancel gives the focus back to the site's text field", async ({
+  page,
+}) => {
+  await holdRounds(page);
+  await openPage(page, "<input><dicta-action></dicta-action>");
+  await page.locator("input").focus();
+  await submit(page, "a");
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("button", { name: "Cancel" })).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.locator(view)).toBeHidden();
+  await expect(page.locator("input")).toBeFocused();
+});
+
+test("Close gives the focus back to the site's text field", async ({
+  page,
+}) => {
+  await reply(page, { type: "stop", text: "No." });
+  await openPage(page, "<input><dicta-action></dicta-action>");
+  await page.locator("input").focus();
+  await submit(page, "a");
+  await expect(page.getByRole("button", { name: "Close" })).toBeVisible();
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("button", { name: "Close" })).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.locator("input")).toBeFocused();
+});
+
+test("the focus goes to the element when the text field is gone", async ({
+  page,
+}) => {
+  await holdRounds(page);
+  await openPage(page, "<input><dicta-action></dicta-action>");
+  await page.locator("input").focus();
+  await submit(page, "a");
+  await page.keyboard.press("Tab");
+  await page.evaluate(() => document.querySelector("input")?.remove());
+  await page.keyboard.press("Enter");
+  await expect(page.locator("dicta-action")).toBeFocused();
+});
+
+test("a view that goes away without the focus leaves it", async ({ page }) => {
+  await holdRounds(page);
+  await openPage(
+    page,
+    "<input><button>Other</button><dicta-action></dicta-action>",
+  );
+  await page.locator("input").focus();
+  await submit(page, "a");
+  await page.keyboard.press("Tab");
+  await page.getByRole("button", { name: "Other" }).focus();
+  await page.getByRole("button", { name: "Cancel" }).click();
+  await expect(page.getByRole("button", { name: "Other" })).toBeFocused();
+});

@@ -182,6 +182,8 @@ export class DictaAction extends HTMLElement {
   #noticeHovered = false;
   #noticeFocused = false;
   #announceTimer: ReturnType<typeof setTimeout> | undefined;
+  // The page element the focus came from into the view, to go back to.
+  #focusFrom: HTMLElement | undefined;
 
   static observedAttributes = ["server"];
 
@@ -214,6 +216,12 @@ export class DictaAction extends HTMLElement {
     this.#view.className = "view";
     this.#view.part.add("view");
     this.#view.hidden = true;
+    this.#view.addEventListener("focusin", (event) => {
+      const from = event.relatedTarget;
+      if (from instanceof HTMLElement && !this.contains(from)) {
+        this.#focusFrom = from;
+      }
+    });
     this.#notice = document.createElement("div");
     this.#notice.className = "notice";
     this.#notice.part.add("notice");
@@ -760,10 +768,25 @@ export class DictaAction extends HTMLElement {
     }
   }
 
+  // Hides the view. When the focus was in it, it goes back to the page element
+  // it came from, or to the element itself when that one is gone.
   #hideView() {
+    const hadFocus = this.#view.contains(
+      this.shadowRoot?.activeElement ?? null,
+    );
     this.#view.hidden = true;
     this.#view.replaceChildren();
     this.#internals.states.clear();
+    if (hadFocus) {
+      const from = this.#focusFrom;
+      if (from?.isConnected) {
+        from.focus();
+      }
+      if (!from?.matches(":focus")) {
+        this.tabIndex = -1;
+        this.focus();
+      }
+    }
   }
 
   #showNotice(text: string) {
