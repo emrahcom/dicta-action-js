@@ -146,14 +146,17 @@ request (`contract-protocol.md`, Added text and cancel).
 
 When a request ends, the view goes away and the outcome is a notice:
 
-- a stop, an error or a done with a text: the text, shown for `notice-duration`
-  seconds or for its reading time, one second for every three words, whichever
-  is longer;
+- a stop, an error or a done with a text: the text, shown as a notice that goes
+  away by itself;
 - an info: the text, in its paragraphs, and Close, until the user closes it
   (`contract-protocol.md`, Response body);
 - a done without a text shows nothing.
 
-The `tooLong` text is a notice too, shown for `notice-duration` seconds.
+The `tooLong` text is a notice that goes away by itself too.
+
+A notice that goes away by itself is shown for `notice-duration` seconds or for
+the reading time of its text, one second for every three words, whichever is
+longer.
 
 The notices are a list, the newest last. A new notice, or a new request, does
 not hide the ones shown. When a fourth would be shown, the oldest that goes away
