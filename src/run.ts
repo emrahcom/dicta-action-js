@@ -197,6 +197,27 @@ function asks(capability: Capability, items?: number, confirmOver = 0) {
   );
 }
 
+// The write capabilities called by more top-level steps than confirmOver,
+// each with its number of steps (contract-plan.md, Confirmation).
+function repeatedWrites(
+  plan: Plan,
+  module: CapabilityModule,
+  confirmOver: number,
+) {
+  const counts = new Map<string, number>();
+  for (const step of plan.steps) {
+    if (isCall(step) && capabilityOf(step, module).level === "write") {
+      counts.set(step.call, (counts.get(step.call) ?? 0) + 1);
+    }
+  }
+  for (const [name, count] of counts) {
+    if (count <= confirmOver) {
+      counts.delete(name);
+    }
+  }
+  return counts;
+}
+
 // Where a running plan is, for a page change in the middle of it
 // (contract-protocol.md, Page changes): the step, and in a forEach the item
 // and call; whether a call runs now; and the outputs so far.
@@ -251,6 +272,7 @@ export async function runPlan(
   const outputs: unknown[] = [];
   const included = progress.included;
   const confirmOver = module.confirmOver ?? DEFAULT_CONFIRM_OVER;
+  const repeated = repeatedWrites(plan, module, confirmOver);
   let halt: Halt | undefined;
 
   for (const [i, step] of plan.steps.entries()) {
@@ -267,9 +289,15 @@ export async function runPlan(
     try {
       if (isCall(step)) {
         const call = prepare(step, module, { outputs });
+        // The first of many steps of one write capability asks for all.
+        const count = repeated.get(step.call);
+        repeated.delete(step.call);
         if (
-          asks(call.capability) &&
-          !(await ask({ items: [[await confirmText(call)]] }))
+          (asks(call.capability) || count !== undefined) &&
+          !(await ask({
+            items: [[await confirmText(call)]],
+            ...(count === undefined ? {} : { count }),
+          }))
         ) {
           halt = stopHalt(number, "cancelled");
           throw new Stopped();

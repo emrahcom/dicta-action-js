@@ -149,3 +149,30 @@ test("the focus moves from Continue to the working view's Cancel", async ({
   await expect(page.locator('[part~="label"]')).toHaveText("Deleting the task");
   await expect(page.getByRole("button", { name: "Cancel" })).toBeFocused();
 });
+
+test("many steps of one write capability ask once with the count", async ({
+  page,
+}) => {
+  const steps = ["t1", "t2", "t3"].map((id) => ({
+    call: "tasks.update",
+    args: { id },
+  }));
+  await replies(page, { type: "plan", plan: { steps } }, done);
+  await openPage(page);
+  await page.evaluate(() => {
+    const element = document.querySelector("dicta-action") as unknown as {
+      module: { confirmOver?: number; capabilities: Record<string, unknown> };
+    };
+    element.module.confirmOver = 2;
+    element.module.capabilities["tasks.update"] = {
+      level: "write",
+      desc: "Updates a task.",
+      args: { type: "object", properties: { id: { type: "string" } } },
+      confirm: async ({ id }: { id: string }) => `Update task ${id}`,
+      run: async ({ id }: { id: string }) => ({ id }),
+    };
+  });
+  await submit(page, "update them");
+  await expect(page.locator(text)).toHaveText(["Update task t1", "3 items"]);
+  expect(await inState(page, "confirmation")).toBe(true);
+});

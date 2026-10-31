@@ -829,3 +829,82 @@ test("a page load at the end of a forEach halts at the next step", async () => {
   assert.deepEqual(report.halt, { step: 3, ...navigated });
   assert.equal(calls.length, 3);
 });
+
+// Many top-level steps of one write capability (contract-plan.md,
+// Confirmation).
+
+function updates(count: number) {
+  return Array.from({ length: count }, (_, i) => ({
+    call: "tasks.update",
+    args: { id: `t${i + 1}` },
+  }));
+}
+
+test("more write steps than confirmOver ask once with the first", async () => {
+  answer = true;
+  const report = await run(
+    { steps: updates(3) },
+    withConfirmOver(confirmModule(1), 2),
+  );
+  assert.deepEqual(asked, [{ items: [["Update t1"]], count: 3 }]);
+  assert.deepEqual(report, {});
+  assert.equal(calls.length, 3);
+});
+
+test("write steps up to confirmOver, 10 by default, do not ask", async () => {
+  await run({ steps: updates(10) }, confirmModule(1));
+  assert.deepEqual(asked, []);
+  await run({ steps: updates(11) }, confirmModule(1));
+  assert.deepEqual(asked, [{ items: [["Update t1"]], count: 11 }]);
+});
+
+test("write steps are counted per capability", async () => {
+  const using = withConfirmOver(
+    moduleWith({
+      ...confirmModule(1).capabilities,
+      "tasks.rename": {
+        level: "write",
+        desc: "Renames a task.",
+        args: { type: "object", properties: { id: { type: "string" } } },
+        confirm: async (args) => `Rename ${String(args.id)}`,
+        run: recorder("tasks.rename", (args) => ({ id: args.id })),
+      },
+    }),
+    2,
+  );
+  await run(
+    {
+      steps: [
+        ...updates(2),
+        { call: "tasks.rename", args: { id: "t1" } },
+        { call: "tasks.rename", args: { id: "t2" } },
+      ],
+    },
+    using,
+  );
+  assert.deepEqual(asked, []);
+});
+
+test("forEach calls are not counted with write steps", async () => {
+  await run(
+    { steps: [{ call: "tasks.list", args: {} }, updateEach, ...updates(2)] },
+    withConfirmOver(confirmModule(2), 2),
+  );
+  assert.deepEqual(asked, []);
+});
+
+test("Cancel at many write steps halts at the first", async () => {
+  answer = false;
+  const report = await run(
+    { steps: [{ call: "tasks.list", args: {} }, ...updates(3)] },
+    withConfirmOver(confirmModule(1), 2),
+  );
+  answer = true;
+  assert.deepEqual(report.halt, {
+    step: 2,
+    code: "cancelled",
+    message: "Cancelled",
+  });
+  // No update ran; this module's tasks.list is not recorded.
+  assert.equal(calls.length, 0);
+});
