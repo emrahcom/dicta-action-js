@@ -105,10 +105,10 @@ Before each round the element calls `module.state.run()` for `state` and takes
 
 A round is `POST <server>/dicta-action/v1/round`. A `401` gets a new token and
 one more try with the same body. Every other HTTP error, a network failure, a
-round without a response after 60 seconds and a reply type the element does not
-know end the request as an error, with no retry (`contract-protocol.md`,
-Errors). The element logs the server's `error` to the console, for the site's
-developers.
+round without a response after 60 seconds, a reply type the element does not
+know and a `getToken` or `module.state.run()` that throws end the request as an
+error, with no retry (`contract-protocol.md`, Errors). The element logs the
+cause to the console, such as the server's `error`, for the site's developers.
 
 ## Display
 
@@ -128,7 +128,8 @@ placed to fit the view:
   an option answers with the option's text.
 - `confirmation`: only the texts from the module's `confirm` as plain text
   (`contract-plan.md`, Confirmation), Continue and Cancel. For a `forEach`, the
-  number of items (the `items` string) and the first three items.
+  first three items, and the number of items (the `items` string) when there are
+  more than the module's `confirmOver`.
 
 An answer or Continue brings back `working`. Cancel in any view cancels the
 request (`contract-protocol.md`, Added text and cancel).
@@ -199,8 +200,8 @@ for example with the site's own translations:
 - `cancel`: "Cancel"
 - `close`: "Close"
 - `error`: "Something went wrong"
-- `items`: "{count} items", the number of items in a `forEach` confirmation; the
-  element puts the number in place of `{count}`
+- `items`: "{count} items", the number of items in a `forEach` confirmation
+  (Display); the element puts the number in place of `{count}`
 - `tooLong`: "The text is too long"
 
 A key left out keeps its English string. An unknown key, or a value that is not
@@ -215,8 +216,11 @@ always as plain text, never as HTML.
 The element meets WCAG 2.2 level AA.
 
 - Everything works by keyboard, with a visible focus indicator.
-- The element never moves the focus. A new view does not take it from the site's
-  text field, so Enter there can never press Continue.
+- The element never takes the focus from outside it. A new view does not take it
+  from the site's text field, so Enter there can never press Continue.
+- When a view goes away while the focus is in it, the focus moves to the same
+  place in the next view, such as its Cancel, so a keyboard user keeps their
+  place.
 - Progress, questions, confirmations and outcomes are announced through a status
   region, which is separate from the visible parts, so hiding a part does not
   silence it.
