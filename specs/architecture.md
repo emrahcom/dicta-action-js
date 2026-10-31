@@ -136,8 +136,8 @@ After a request, each view has a Close button:
 
 - `stop` and `error`: the text and Close, until the user closes it or submits
   new text.
-- `info`: the text, in its paragraphs, and Close, until the user closes it
-  (`contract-protocol.md`, Response body).
+- `info`: the text, in its paragraphs, and Close, until the user closes it or
+  submits new text (`contract-protocol.md`, Response body).
 
 A done shows no view: with a text, the text is shown as a notice; without one,
 nothing is shown.
