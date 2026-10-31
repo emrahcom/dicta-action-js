@@ -129,7 +129,7 @@ placed to fit the view:
 - `confirmation`: only the texts from the module's `confirm` as plain text
   (`contract-plan.md`, Confirmation), Continue and Cancel. For a `forEach`, the
   first three items, and the number of items (the `items` string) when there are
-  more than the module's `confirmOver`.
+  more than three (`contract-plan.md`, Confirmation).
 
 An answer or Continue brings back `working`. Cancel in any view cancels the
 request (`contract-protocol.md`, Added text and cancel).
@@ -221,7 +221,7 @@ The element meets WCAG 2.2 level AA.
 - When a view goes away while the focus is in it, the focus moves to the same
   place in the next view, such as its Cancel, so a keyboard user keeps their
   place.
-- Progress, questions, confirmations and outcomes are announced through a status
-  region, which is separate from the visible parts, so hiding a part does not
-  silence it.
+- Progress, questions, confirmations, outcomes and notices are announced through
+  a status region, which is separate from the visible parts, so hiding a part
+  does not silence it.
 - All text and buttons have enough contrast.
