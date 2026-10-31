@@ -44,9 +44,9 @@ names them without the repo.
   in `dicta-js`. It is called for the first round and again after a `401`; the
   element keeps the token in memory between rounds. Without it, rounds are sent
   without `Authorization`, for a server with authentication turned off.
-- `notice-duration`: an attribute, how long a notice is shown (Display), in
-  seconds, a whole number from 1, by default 5. Another value is ignored, and 5
-  applies.
+- `notice-duration`: an attribute, the shortest time a notice that goes away by
+  itself is shown (Display), in seconds, a whole number from 1, by default 5.
+  Another value is ignored, and 5 applies.
 - `strings`: an optional object that overrides the element's own strings by key
   (Strings).
 - `submit(text)`: a method that passes the user's text. The text is trimmed;
@@ -63,16 +63,17 @@ CSS parts let the integrator style or hide each part of the element:
 - `view`: the box that holds the view shown (Display).
 - `indicator`: the progress indicator.
 - `label`: the plan's label.
-- `text`: the text of a question, a confirmation, a stop, an error or an info.
-- `option`, `continue`, `cancel`, `close`: the buttons.
-- `notice`: a notice (Display).
+- `text`: the text of a question or a confirmation.
+- `option`, `continue`, `cancel`: the buttons of a view.
+- `notice`: each notice (Display).
+- `close`: the Close button of an info notice.
 
 While a view is shown, the element has a custom state with the view's name
-(Display): `working`, `question`, `confirmation`, `stop`, `error` or `info`.
-With the state, a part is styled in one view only:
+(Display): `working`, `question` or `confirmation`. With the state, a part is
+styled in one view only:
 
 ```css
-dicta-action:state(info)::part(view) {
+dicta-action:state(confirmation)::part(view) {
   max-width: 40rem;
 }
 dicta-action:state(question)::part(cancel) {
@@ -117,8 +118,9 @@ cause to the console, such as the server's `error`, for the site's developers.
 
 The element shows little: the user wants the task done, not to read.
 
-The element shows one view at a time, or none. The name of the view shown is
-also the element's custom state (Element), for styling.
+The element shows one view at a time, or none, and notices beside it. A view
+waits for the user; a notice tells something and does not. The name of the view
+shown is also the element's custom state (Element), for styling.
 
 While a request runs, from the submit on, each view has its own Cancel button,
 placed to fit the view:
@@ -139,23 +141,24 @@ placed to fit the view:
 An answer or Continue brings back `working`. Cancel in any view cancels the
 request (`contract-protocol.md`, Added text and cancel).
 
-After a request, each view has a Close button:
+When a request ends, the view goes away and the outcome is a notice:
 
-- `stop` and `error`: the text and Close, until the user closes it or submits
-  new text.
-- `info`: the text, in its paragraphs, and Close, until the user closes it or
-  submits new text (`contract-protocol.md`, Response body).
+- a stop, an error or a done with a text: the text, shown for `notice-duration`
+  seconds or for its reading time, one second for every three words, whichever
+  is longer;
+- an info: the text, in its paragraphs, and Close, until the user closes it
+  (`contract-protocol.md`, Response body);
+- a done without a text shows nothing.
 
-A done shows no view: with a text, the text is shown as a notice; without one,
-nothing is shown.
+The `tooLong` and `pageLoad` texts are notices too, shown for `notice-duration`
+seconds.
 
-A notice is a short text that goes away by itself and never waits for a click:
-the text of a done, the `tooLong` text and the `pageLoad` text. It is not a
-view, so it can be shown beside one. It is shown for `notice-duration` seconds.
-While the pointer is over it or it has focus, it stays, and the time starts
-again when they leave.
+The notices are a list, the newest last. A new notice, or a new request, does
+not hide the ones shown. When a fourth would be shown, the oldest that goes away
+by itself goes first; an info never does. While the pointer is over a notice or
+it has focus, it stays, and its time starts again when they leave.
 
-On `pagehide`, the element hides its view and its notice, so a page the browser
+On `pagehide`, the element hides its view and its notices, so a page the browser
 shows again from its back/forward cache shows no request that is over.
 
 ## Plan runner
@@ -215,9 +218,11 @@ for example with the site's own translations:
 
 - `continue`: "Continue"
 - `cancel`: "Cancel"
-- `close`: "Close"
+- `close`: "Close", for an info notice
 - `done`: "Done", announced only, for a done without a text (Accessibility)
 - `error`: "Something went wrong"
+- `info`: "New information", announced only, when an info is shown
+  (Accessibility)
 - `items`: "{count} items", the number of items in a `forEach` confirmation, or
   of top-level steps of one write capability (Display); the element puts the
   number in place of `{count}`
@@ -242,14 +247,19 @@ The element meets WCAG 2.2 level AA.
 - The element never takes the focus from outside it. A new view does not take it
   from the site's text field, so Enter there can never press Continue.
 - When a view goes away while the focus is in it, the focus moves to the next
-  view's Cancel or Close. When no view follows, it goes back to the page element
-  it came from into the view, usually the site's text field. If that one is
-  gone, it goes to the `<dicta-action>` element itself (`tabindex="-1"`).
-- Progress, questions, confirmations, outcomes and notices are announced through
-  a status region, which is separate from the visible parts, so hiding a part
-  does not silence it.
+  view's Cancel. When no view follows, or an info is closed with the focus on
+  its Close, the focus goes back to the page element it came from into the
+  element, usually the site's text field. If that one is gone, it goes to the
+  `<dicta-action>` element itself (`tabindex="-1"`).
+- Progress, questions, confirmations and notices are announced through a status
+  region, which is separate from the visible parts, so hiding a part does not
+  silence it. An announcement never replaces one that is not read yet; they are
+  read one after the other.
+- An info's text is not announced, since it can be long: the `info` string is.
+  Its notice can take the focus, so the user moves to it to read the text.
 - A screen reader user hears every request from start to end, also where the
   screen shows little: the `working` string when a request starts or goes on in
   a new page, the plan's label when it has one, and the `done` string for a done
-  without a text. These two strings are announced only, never shown.
+  without a text. The `working`, `done` and `info` strings are announced only,
+  never shown.
 - All text and buttons have enough contrast.
