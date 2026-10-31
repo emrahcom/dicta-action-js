@@ -160,6 +160,10 @@ example with the site's own translations:
 - `error`: "Something went wrong"
 - `tooLong`: "The text is too long"
 
+A key left out keeps its English text. An unknown key, or a value that is not a
+string, is ignored. The element reads `texts` each time it shows a text, so a
+site that changes its language sets `texts` again.
+
 Texts from the server and from the module's `confirm` are shown as they come.
 
 ## Accessibility
