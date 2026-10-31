@@ -59,12 +59,18 @@ input.addEventListener("dicta-text", (e) => action.submit(e.detail.text));
 
 CSS parts let the integrator style or hide each part of the element:
 
+- `working`, `question`, `confirmation`: each view as a whole (Display).
 - `label`: the plan's label and the progress indicator.
 - `message`: the text of a question, a stop, an info or an error.
 - `notice`: a notice (Display).
 - `option`: each option button of a question.
 - `confirm`: the confirmation texts and the hint.
-- `continue`, `cancel`, `close`: the buttons.
+- `continue`, `close`: the buttons.
+- `cancel`: every Cancel button. Each also has a part named after its view,
+  `working-cancel`, `question-cancel` or `confirmation-cancel`, so one can be
+  styled alone, for example `dicta-action::part(question-cancel)`. A part
+  selector cannot reach into another part, so the view parts alone cannot do
+  this.
 
 ## Requests
 
