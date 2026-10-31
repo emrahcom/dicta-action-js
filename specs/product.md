@@ -43,8 +43,9 @@ the site's capability functions, with the user's own rights.
   the plan, and the server decides what comes next (`contract-protocol.md` in
   `dicta-action-server`, Added text and cancel).
 - Before a risky step, the user clicks Continue or Cancel: a destructive or
-  external step, or a `forEach` with a write call and more items than the
-  module's `confirmOver` (`contract-plan.md` in `dicta-action-server`,
+  external step, a `forEach` with a write call and more items than the module's
+  `confirmOver`, or the first of more than `confirmOver` top-level steps that
+  call one write capability (`contract-plan.md` in `dicta-action-server`,
   Confirmation).
 - A question from the server is shown with its options as buttons. While a
   question is open, the next text the application passes is the answer.

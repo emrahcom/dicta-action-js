@@ -132,7 +132,9 @@ placed to fit the view:
 - `confirmation`: only the texts from the module's `confirm` as plain text
   (`contract-plan.md`, Confirmation), Continue and Cancel. For a `forEach`, the
   first three items, and the number of items (the `items` string) when there are
-  more than three (`contract-plan.md`, Confirmation).
+  more than three. For many top-level steps of one write capability, the text of
+  the first and the number of these steps (the `items` string)
+  (`contract-plan.md`, Confirmation).
 
 An answer or Continue brings back `working`. Cancel in any view cancels the
 request (`contract-protocol.md`, Added text and cancel).
@@ -216,8 +218,9 @@ for example with the site's own translations:
 - `close`: "Close"
 - `done`: "Done", announced only, for a done without a text (Accessibility)
 - `error`: "Something went wrong"
-- `items`: "{count} items", the number of items in a `forEach` confirmation
-  (Display); the element puts the number in place of `{count}`
+- `items`: "{count} items", the number of items in a `forEach` confirmation, or
+  of top-level steps of one write capability (Display); the element puts the
+  number in place of `{count}`
 - `pageLoad`: "Wait for the page to load", for text that comes during a page
   load (Requests)
 - `tooLong`: "The text is too long"
