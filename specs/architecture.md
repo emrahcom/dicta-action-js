@@ -119,7 +119,9 @@ From the submit until the request ends, the element shows one view at a time,
 and each view has its own Cancel button, placed to fit the view:
 
 - Working, while the element waits for the server or runs a plan: a progress
-  indicator, with the label of the running plan when it has one, and Cancel.
+  indicator, with the label of the running plan when it has one, and Cancel. The
+  indicator is a small spinner drawn with CSS. When the user prefers reduced
+  motion (`prefers-reduced-motion`), it stands still.
 - Question: the question's text, its options as buttons and Cancel. A click on
   an option answers with the option's text.
 - Confirmation: only the texts from the module's `confirm` as plain text,
