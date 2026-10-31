@@ -198,15 +198,6 @@ test("an HTTP error shows the error view and logs the cause", async ({
   );
 });
 
-test("a plan ends the request as an error for now", async ({ page }) => {
-  await reply(page, { type: "plan", plan: { steps: [] } });
-  await openPage(page);
-  await submit(page, "a");
-  await expect(page.locator('[part~="text"]')).toHaveText(
-    "Something went wrong",
-  );
-});
-
 test("strings override the element's own texts", async ({ page }) => {
   await page.route(ROUND, (route) => route.fulfill({ status: 500, json: {} }));
   await openPage(page);

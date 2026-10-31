@@ -1,5 +1,6 @@
 // Opens the test server's page (server.ts), which loads the built module, puts
 // the given markup into its body and gives each <dicta-action> a small module
+// with tasks.list and tasks.get
 // and, unless set, this page's origin as its server.
 // The server's responses are faked with reply().
 
@@ -23,7 +24,34 @@ export async function openPage(
         module: {
           site: { name: "Teamboard", desc: "A task list." },
           state: { desc: "The open page.", run: async () => ({ page: "a" }) },
-          capabilities: {},
+          capabilities: {
+            "tasks.list": {
+              level: "read",
+              desc: "Lists the tasks.",
+              output: { type: "array" },
+              run: async () => [
+                { id: "t1", title: "Budget" },
+                { id: "t2", title: "Review" },
+              ],
+            },
+            "tasks.get": {
+              level: "read",
+              desc: "Returns a task.",
+              args: {
+                type: "object",
+                properties: { id: { type: "string" } },
+                required: ["id"],
+              },
+              run: async ({ id }: { id: string }) => {
+                if (id !== "t1") {
+                  throw Object.assign(new Error("No such task"), {
+                    code: "not_found",
+                  });
+                }
+                return { id, title: "Budget" };
+              },
+            },
+          },
         },
       });
     }

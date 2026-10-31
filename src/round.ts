@@ -64,6 +64,15 @@ export class RoundClient {
     this.#getToken = getToken;
   }
 
+  // The module and the site context built from it, for running plans.
+  get module() {
+    return this.#module;
+  }
+
+  get context() {
+    return this.#context;
+  }
+
   async send(round: Round): Promise<{ requestId: string; reply: Reply }> {
     let state: Record<string, unknown>;
     try {

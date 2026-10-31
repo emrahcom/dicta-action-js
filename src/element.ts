@@ -1,8 +1,11 @@
 // The <dicta-action> element: it takes the user's text, runs the request with
 // the server and shows what happens to it (specs/architecture.md).
 
+import type { SiteContext } from "./context.ts";
 import type { CapabilityModule } from "./module.ts";
+import { checkPlan, type Plan } from "./plan.ts";
 import { type Reply, RoundClient } from "./round.ts";
+import { cut, type Report, runPlan } from "./run.ts";
 
 type View = "working" | "question" | "confirmation" | "stop" | "error" | "info";
 
@@ -221,9 +224,49 @@ export class DictaAction extends HTMLElement {
         this.#request = undefined;
         this.#showEnd(reply.type, reply.text);
         break;
-      default:
-        // Plans come in their own task.
-        this.#fail(new Error(`${reply.type} replies are not supported yet`));
+      case "plan":
+        void this.#runPlan(request, reply.plan);
+        break;
+    }
+  }
+
+  // Checks and runs a plan, then reports it in the next round, whether it
+  // finished or halted (contract-plan.md, Reporting).
+  async #runPlan(request: Request, plan: unknown) {
+    let report: Report;
+    try {
+      const client = this.#roundClient();
+      report = this.#invalid(plan, client.context) ?? {};
+      if (report.halt === undefined) {
+        const { text } = plan as Plan;
+        this.#showWorking(text);
+        if (text) {
+          this.#announce(text);
+        }
+        report = await runPlan(plan as Plan, client.module);
+      }
+    } catch (err) {
+      if (this.#request === request) {
+        this.#fail(err);
+      }
+      return;
+    }
+    if (this.#request !== request) {
+      return;
+    }
+    request.exchange.push({ plan, report });
+    void this.#round(request);
+  }
+
+  // The report of a plan that fails the check: no step ran, so its halt has
+  // no step (contract-protocol.md, Report).
+  #invalid(plan: unknown, context: SiteContext): Report | undefined {
+    try {
+      checkPlan(plan, context);
+      return undefined;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return { halt: { code: "invalid", message: cut(message) } };
     }
   }
 
@@ -287,7 +330,7 @@ export class DictaAction extends HTMLElement {
     return button;
   }
 
-  #showWorking() {
+  #showWorking(text?: string) {
     const indicator = document.createElement("span");
     indicator.className = "indicator";
     indicator.part.add("indicator");
@@ -295,6 +338,7 @@ export class DictaAction extends HTMLElement {
     const label = document.createElement("span");
     label.className = "label";
     label.part.add("label");
+    label.textContent = text ?? "";
     this.#setView("working", [
       indicator,
       label,

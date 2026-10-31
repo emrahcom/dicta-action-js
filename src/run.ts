@@ -50,7 +50,7 @@ function isContainer(value: unknown): value is Record<string, unknown> {
 }
 
 // Cuts a message to 200 characters (Unicode code points).
-function cut(message: string) {
+export function cut(message: string) {
   const chars = Array.from(message);
   return chars.length > MAX_MESSAGE_CHARS
     ? chars.slice(0, MAX_MESSAGE_CHARS).join("")
