@@ -149,6 +149,9 @@ the text of a done and the `tooLong` text. It is not a view, so it can be shown
 beside one. It is shown for `notice-duration` seconds. While the pointer is over
 it or it has focus, it stays, and the time starts again when they leave.
 
+On `pagehide`, the element hides its view and its notice, so a page the browser
+shows again from its back/forward cache shows no request that is over.
+
 ## Plan runner
 
 The runner follows `contract-plan.md` and builds the report of
@@ -182,7 +185,8 @@ The element keeps two entries in the tab's `sessionStorage`, as JSON:
   when storage is full, the oldest go first.
 
 When the element has its `server` and `module`, it looks for a saved request,
-takes it out and goes on or ends it (`contract-protocol.md`, Page changes).
+takes it out and goes on or ends it (`contract-protocol.md`, Page changes). It
+looks again when the page is shown from the back/forward cache (`pageshow`).
 
 ## Built-in capabilities
 
