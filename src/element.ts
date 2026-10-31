@@ -234,12 +234,14 @@ export class DictaAction extends HTMLElement {
   connectedCallback() {
     window.addEventListener("beforeunload", this.#onBeforeUnload);
     window.addEventListener("pagehide", this.#onPageHide);
+    window.addEventListener("pageshow", this.#onPageShow);
     this.#resume();
   }
 
   disconnectedCallback() {
     window.removeEventListener("beforeunload", this.#onBeforeUnload);
     window.removeEventListener("pagehide", this.#onPageHide);
+    window.removeEventListener("pageshow", this.#onPageShow);
   }
 
   // Browsers abort a pending round when a page load starts, after
@@ -254,16 +256,33 @@ export class DictaAction extends HTMLElement {
     this.#resume();
   }
 
+  #onPageHide = () => {
+    // The page load has happened: a later failed round is an error at once.
+    this.#leaving = false;
+    const request = this.#request;
+    if (request !== undefined) {
+      this.#request = undefined;
+      request.left = true;
+      this.#leave(request);
+    }
+    // A page the browser shows again from its back/forward cache shows no
+    // request that is over.
+    this.#hideView();
+    this.#hideNotice();
+  };
+
+  // A page shown again from the back/forward cache does not start again, so
+  // it looks for a saved request here (contract-protocol.md, Page changes).
+  #onPageShow = (event: PageTransitionEvent) => {
+    if (event.persisted) {
+      this.#resume();
+    }
+  };
+
   // The page is left in the middle of a request: it goes on in the new page
   // only if a step runs; otherwise it ends as cancelled, with everything done
   // so far (contract-protocol.md, Page changes).
-  #onPageHide = () => {
-    const request = this.#request;
-    if (request === undefined) {
-      return;
-    }
-    this.#request = undefined;
-    request.left = true;
+  #leave(request: Request) {
     const { progress, plan } = request;
     if (
       request.phase === "running" &&
@@ -292,7 +311,7 @@ export class DictaAction extends HTMLElement {
       });
     }
     this.#store(request, { type: "cancelled" });
-  };
+  }
 
   // Takes a saved request out once the element has its server and module. A
   // recent one goes on with its report in the next round, which sends the new
