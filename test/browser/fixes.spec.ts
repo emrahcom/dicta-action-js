@@ -14,9 +14,10 @@ test("the pointer over one notice does not keep the next one", async ({
   );
   await openPage(page, '<dicta-action notice-duration="1"></dicta-action>');
   await submit(page, "a");
-  await page.locator(notice).hover();
   await submit(page, "b");
   await expect(page.locator(notice)).toHaveText(["First.", "Second."]);
+  // Hovered once no view moves the notices any more.
+  await page.locator(notice).first().hover();
   await page.clock.runFor(1100);
   await expect(page.locator(notice)).toHaveText(["First."]);
 });

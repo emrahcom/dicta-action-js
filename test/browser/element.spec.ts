@@ -390,3 +390,43 @@ test("a view that goes away without the focus leaves it", async ({ page }) => {
   await page.getByRole("button", { name: "Cancel" }).click();
   await expect(page.getByRole("button", { name: "Other" })).toBeFocused();
 });
+
+test("getToken set before the element is defined, and set again", async ({
+  page,
+}) => {
+  const headers: (string | undefined)[] = [];
+  await page.route(ROUND, (route) => {
+    headers.push(route.request().headers().authorization);
+    return route.fulfill({
+      json: { requestId: "r1", reply: { type: "done" } },
+    });
+  });
+  // A page without the package yet, so the element is not defined.
+  await page.route("**/blank", (route) =>
+    route.fulfill({ contentType: "text/html", body: "<!doctype html><body>" }),
+  );
+  await page.goto("/blank");
+  await page.evaluate(async () => {
+    document.body.innerHTML = "<dicta-action></dicta-action>";
+    const element = document.querySelector("dicta-action")!;
+    element.setAttribute("server", location.origin);
+    Object.assign(element, { getToken: async () => "first" });
+    await import("/dist/index.js" as string);
+    Object.assign(element, {
+      module: {
+        site: { name: "Teamboard", desc: "A task list." },
+        state: { desc: "The open page.", run: async () => ({}) },
+        capabilities: {},
+      },
+    });
+  });
+  await submit(page, "a");
+  await expect.poll(() => headers).toEqual(["Bearer first"]);
+  await page.evaluate(() =>
+    Object.assign(document.querySelector("dicta-action")!, {
+      getToken: async () => "second",
+    }),
+  );
+  await submit(page, "b");
+  await expect.poll(() => headers).toEqual(["Bearer first", "Bearer second"]);
+});

@@ -141,3 +141,30 @@ test("a too long answer leaves the question open", async ({ page }) => {
   await expect(page.locator('[part~="text"]')).toHaveText("When?");
   expect(bodies.length).toBe(1);
 });
+
+test("several held texts: the first starts a request, the rest are added", async ({
+  page,
+}) => {
+  const routes = await holdRounds(page);
+  await openPage(page);
+  await submit(page, "first");
+  await expect.poll(() => routes.length).toBe(1);
+  await submit(page, "second");
+  await submit(page, "third");
+  await routes[0].fulfill({ json: { requestId: "r1", reply: done } });
+  await expect.poll(() => routes.length).toBe(2);
+  expect(routes[1].request().postDataJSON()).toMatchObject({
+    text: "second",
+    exchange: [],
+  });
+  // "third" waits as added text of the new request: the question is dropped.
+  await routes[1].fulfill({
+    json: { requestId: "r2", reply: { type: "question", text: "When?" } },
+  });
+  await expect.poll(() => routes.length).toBe(3);
+  expect(routes[2].request().postDataJSON()).toMatchObject({
+    requestId: "r2",
+    text: "second",
+    exchange: [{ added: "third" }],
+  });
+});
