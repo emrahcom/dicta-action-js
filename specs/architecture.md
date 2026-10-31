@@ -59,20 +59,27 @@ input.addEventListener("dicta-text", (e) => action.submit(e.detail.text));
 
 CSS parts let the integrator style or hide each part of the element:
 
-- `working`, `question`, `confirmation`: each view as a whole (Display).
+- `view`: the box of the view shown.
 - `indicator`: the progress indicator.
 - `label`: the plan's label.
-- `question-text`: the question's text.
-- `stop`, `error`, `info`: each as a whole, with its text and its Close button.
+- `text`: the text of a question, a confirmation, a stop, an error or an info.
+- `hint`: the hint "Click Continue or Cancel" (Requests).
+- `option`, `continue`, `cancel`, `close`: the buttons.
 - `notice`: a notice (Display).
-- `option`: each option button of a question.
-- `confirm`: the confirmation texts and the hint.
-- `continue`, `close`: the buttons.
-- `cancel`: every Cancel button. Each also has a part named after its view,
-  `working-cancel`, `question-cancel` or `confirmation-cancel`, so one can be
-  styled alone, for example `dicta-action::part(question-cancel)`. A part
-  selector cannot reach into another part, so the view parts alone cannot do
-  this.
+
+The element has a custom state that names the view shown, one at a time:
+`working`, `question` or `confirmation` while a request runs, and `stop`,
+`error` or `info` after it (Display). With the state, a part is styled in one
+view only:
+
+```css
+dicta-action:state(info)::part(view) {
+  max-width: 40rem;
+}
+dicta-action:state(question)::part(cancel) {
+  color: gray;
+}
+```
 
 ## Requests
 
@@ -130,9 +137,10 @@ After the request, or beside it:
   starts again when they leave.
 - Done with a text: its text is shown as a notice. Done without a text: nothing
   is shown; the progress indicator goes away.
-- A stop and an error: shown until the user closes them or submits new text.
-- An info: shown with its paragraphs until the user closes it
-  (`contract-protocol.md`, Response body).
+- Stop and error: views with the text and Close, shown until the user closes
+  them or submits new text.
+- Info: a view with the text, in its paragraphs, and Close, shown until the user
+  closes it (`contract-protocol.md`, Response body).
 
 ## Plan runner
 
