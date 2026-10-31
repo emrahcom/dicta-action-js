@@ -44,8 +44,8 @@ names them without the repo.
   in `dicta-js`. It is called for the first round and again after a `401`; the
   element keeps the token in memory between rounds. Without it, rounds are sent
   without `Authorization`, for a server with authentication turned off.
-- `done-seconds`: how long a done with a text is shown (Display), a whole number
-  from 1, by default 5. Another value is ignored, and 5 applies.
+- `notice-duration`: how long a notice is shown (Display), in seconds, a whole
+  number from 1, by default 5. Another value is ignored, and 5 applies.
 - `texts`: an optional object that overrides the element's own texts by key
   (Texts).
 - `submit(text)`: a method that passes the user's text. The text is trimmed;
@@ -60,10 +60,10 @@ input.addEventListener("dicta-text", (e) => action.submit(e.detail.text));
 CSS parts let the integrator style or hide each part of the element:
 
 - `label`: the plan's label and the progress indicator.
-- `message`: the text of a question, a done with a text, a stop, an info or an
-  error.
+- `message`: the text of a question, a stop, an info or an error.
+- `notice`: a notice (Display).
 - `option`: each option button of a question.
-- `confirm`: the confirmation texts.
+- `confirm`: the confirmation texts and the hint.
 - `continue`, `cancel`, `close`: the buttons.
 
 ## Requests
@@ -73,14 +73,14 @@ The element runs one request at a time. `submit(text)`:
 - With no request running: starts a new request.
 - While a question is open: answers it.
 - While a confirmation is open: is ignored, and the element shows the hint
-  "Click Continue or Cancel" (Texts).
+  "Click Continue or Cancel" (Texts) until the confirmation ends.
 - While the element waits for the server or runs a plan: is added text
   (`contract-protocol.md`, Added text and cancel). The client takes all text
   that comes; background speech from an always-open microphone is a known open
   point.
 - Text over 10000 characters (Unicode code points) is not taken: the element
-  shows the `tooLong` text and nothing else changes (`contract-protocol.md`,
-  Limits).
+  shows the `tooLong` text as a notice (Display) and nothing else changes
+  (`contract-protocol.md`, Limits).
 
 The text becomes the request's `text`, a question's `answer` or an `added` item
 (`contract-protocol.md`, Request body).
@@ -107,10 +107,12 @@ The element shows little: the user wants the task done, not to read.
 - A confirmation: only the texts from the module's `confirm` as plain text,
   without the plan's label (`contract-plan.md`, Confirmation), and Continue next
   to Cancel. For a `forEach`, the number of items and the first three items.
-- Done with a text: shown for `done-seconds`, then it goes away. While the
-  pointer is over it or it has focus, it stays, and the time starts again when
-  they leave. Done without a text: nothing is shown; the progress indicator goes
-  away. A done never waits for a click.
+- A notice: a short text that goes away by itself and never waits for a click:
+  the text of a done and the `tooLong` text. It is shown for `notice-duration`
+  seconds. While the pointer is over it or it has focus, it stays, and the time
+  starts again when they leave.
+- Done with a text: its text is shown as a notice. Done without a text: nothing
+  is shown; the progress indicator goes away.
 - A stop and an error: shown until the user closes them or submits new text.
 - An info: shown with its paragraphs until the user closes it
   (`contract-protocol.md`, Response body).
