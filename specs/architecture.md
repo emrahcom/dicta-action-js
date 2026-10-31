@@ -16,8 +16,8 @@ application --text--> dicta-action-js (browser) --round--> dicta-action-server
    each plan with the module's capabilities, shows questions and confirmations
    and reports back, until the request ends.
 
-The contracts are in `dicta-action-server/specs/`. This file names them without
-the repo.
+The contracts and the glossary are in `dicta-action-server/specs/`. This file
+names them without the repo.
 
 ## Delivery
 
@@ -78,6 +78,9 @@ The element runs one request at a time. `submit(text)`:
 - Text over 10000 characters (Unicode code points) is not taken: the element
   shows the `tooLong` text and nothing else changes (`contract-protocol.md`,
   Limits).
+
+The text becomes the request's `text`, a question's `answer` or an `added` item
+(`contract-protocol.md`, Request body).
 
 Before each round the element calls `module.state.run()` for `state` and takes
 `time` from the browser: local time to the second, with the offset as numbers,
