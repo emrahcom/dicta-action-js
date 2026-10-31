@@ -186,7 +186,8 @@ takes it out and goes on or ends it (`contract-protocol.md`, Page changes).
 
 `dictaCapabilities` holds `dicta.listHistory` and `dicta.getHistory`
 (`contract-capability.md`, Built-in capabilities), with `args` and `output`
-schemas. They read `dicta-action-history` directly, so they need no element.
+schemas. They read `dicta-action-history` from session storage themselves, so
+they do not depend on the `<dicta-action>` element.
 
 ## Strings
 
