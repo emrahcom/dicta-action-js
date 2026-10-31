@@ -59,7 +59,7 @@ input.addEventListener("dicta-text", (e) => action.submit(e.detail.text));
 
 CSS parts let the integrator style or hide each part of the element:
 
-- `view`: the box of the view shown.
+- `view`: the box that holds the view shown (Display).
 - `indicator`: the progress indicator.
 - `label`: the plan's label.
 - `text`: the text of a question, a confirmation, a stop, an error or an info.
