@@ -15,7 +15,7 @@ const MAX_ITEMS = 100;
 const MAX_OUTPUT_BYTES = 16 * 1024;
 const MAX_MESSAGE_CHARS = 200;
 
-export type Halt = {
+type Halt = {
   step?: number;
   code: string;
   message: string;
@@ -162,7 +162,7 @@ async function confirmText({ capability, args }: Prepared) {
 export type Confirmation = { items: string[][]; count?: number };
 
 // Asks the user; true is Continue, false is Cancel.
-export type Ask = (confirmation: Confirmation) => Promise<boolean>;
+type Ask = (confirmation: Confirmation) => Promise<boolean>;
 
 class Cancelled extends Error {}
 

@@ -3,7 +3,7 @@
 
 import type { CapabilityModule, Level, Schema } from "./module.ts";
 
-export type ContextCapability = {
+type ContextCapability = {
   name: string;
   level: Level;
   desc: string;

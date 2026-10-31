@@ -19,25 +19,32 @@ import { saveRequest, takeSaved } from "./saved.ts";
 
 type View = "working" | "question" | "confirmation" | "stop" | "error" | "info";
 
+// Where a running request is: waiting for the server, a question open, a plan
+// running, or a confirmation open in that plan.
+type Phase = "waiting" | "question" | "running" | "confirmation";
+
 // A running user request (contract-protocol.md, Request body).
 type Request = {
   text: string;
   requestId?: string;
   exchange: unknown[];
-  // The text of the open question.
+  phase: Phase;
+  // The text of the open question, for its answer.
   question?: string;
-  // While a confirmation is open, text is ignored.
-  confirming?: boolean;
   // Text the user added that is not in the exchange yet.
   added: string[];
-  // While a plan runs; a cancel then waits for its last report.
-  running?: boolean;
   // The running plan and where it is, for a page change.
   plan?: unknown;
   progress?: Progress;
   // Set when the page was left; the request is saved or stored already.
   left?: boolean;
 };
+
+// While a plan runs, also with a confirmation open; a cancel then waits for
+// its last report.
+function planRuns(request: Request) {
+  return request.phase === "running" || request.phase === "confirmation";
+}
 
 // A saved request older than this ends instead of going on.
 const SAVED_MS = 60_000;
@@ -258,7 +265,11 @@ export class DictaAction extends HTMLElement {
     this.#request = undefined;
     request.left = true;
     const { progress, plan } = request;
-    if (progress?.running && request.requestId !== undefined) {
+    if (
+      request.phase === "running" &&
+      progress?.running &&
+      request.requestId !== undefined
+    ) {
       saveRequest({
         savedAt: Date.now(),
         requestId: request.requestId,
@@ -273,7 +284,7 @@ export class DictaAction extends HTMLElement {
       });
       return;
     }
-    if (progress !== undefined) {
+    if (progress !== undefined && planRuns(request)) {
       // A report not sent yet goes into the history too.
       request.exchange.push({
         plan,
@@ -302,6 +313,7 @@ export class DictaAction extends HTMLElement {
       text: saved.text,
       requestId: saved.requestId,
       exchange: [...saved.exchange, { plan: saved.plan, report: saved.report }],
+      phase: "waiting",
       added: [],
     };
     if (Date.now() - saved.savedAt > SAVED_MS) {
@@ -325,14 +337,20 @@ export class DictaAction extends HTMLElement {
     const request = this.#request;
     if (request === undefined) {
       this.#hideNotice();
-      this.#request = { text: trimmed, exchange: [], added: [] };
+      this.#request = {
+        text: trimmed,
+        exchange: [],
+        phase: "waiting",
+        added: [],
+      };
       this.#announce(this.#string("working"));
       void this.#round(this.#request);
-    } else if (request.question !== undefined) {
+    } else if (request.phase === "question") {
       this.#answer(request, trimmed);
-    } else if (!request.confirming) {
+    } else if (request.phase !== "confirmation") {
       // The request is waiting for the server or running a plan (contract-
-      // protocol.md, Added text and cancel).
+      // protocol.md, Added text and cancel). During a confirmation, text is
+      // ignored.
       request.added.push(trimmed);
     }
   }
@@ -347,6 +365,7 @@ export class DictaAction extends HTMLElement {
 
   // Sends the next round of the request and acts on its reply.
   async #round(request: Request) {
+    request.phase = "waiting";
     this.#showWorking();
     let requestId: string;
     let reply: Reply;
@@ -394,6 +413,7 @@ export class DictaAction extends HTMLElement {
     }
     switch (reply.type) {
       case "question":
+        request.phase = "question";
         request.question = reply.text;
         this.#showQuestion(request, reply.text, reply.options ?? []);
         break;
@@ -428,6 +448,7 @@ export class DictaAction extends HTMLElement {
   // Checks and runs a plan, then reports it in the next round, whether it
   // finished or halted (contract-plan.md, Reporting).
   async #runPlan(request: Request, plan: unknown) {
+    request.phase = "running";
     let report: Report;
     try {
       const client = this.#roundClient();
@@ -438,7 +459,6 @@ export class DictaAction extends HTMLElement {
         if (text) {
           this.#announce(text);
         }
-        request.running = true;
         request.plan = plan;
         request.progress = newProgress();
         report = await runPlan(
@@ -455,14 +475,14 @@ export class DictaAction extends HTMLElement {
         );
       }
     } catch (err) {
-      request.running = false;
+      request.plan = undefined;
       request.progress = undefined;
       if (this.#request === request) {
         this.#fail(request, err);
       }
       return;
     }
-    request.running = false;
+    request.plan = undefined;
     request.progress = undefined;
     request.exchange.push({ plan, report });
     if (this.#request !== request) {
@@ -491,10 +511,13 @@ export class DictaAction extends HTMLElement {
 
   #answer(request: Request, answer: string) {
     const question = request.question;
-    if (question === undefined || this.#request !== request) {
+    if (
+      request.phase !== "question" ||
+      question === undefined ||
+      this.#request !== request
+    ) {
       return;
     }
-    request.question = undefined;
     request.exchange.push({ question, answer });
     void this.#round(request);
   }
@@ -534,7 +557,7 @@ export class DictaAction extends HTMLElement {
     const request = this.#request;
     this.#request = undefined;
     this.#hideView();
-    if (request !== undefined && !request.running) {
+    if (request !== undefined && !planRuns(request)) {
       this.#store(request, { type: "cancelled" });
     }
   }
@@ -574,7 +597,7 @@ export class DictaAction extends HTMLElement {
         resolve(false);
         return;
       }
-      request.confirming = true;
+      request.phase = "confirmation";
       const texts = confirmation.items.map((item) => item.join("\n"));
       if (confirmation.count !== undefined) {
         texts.push(
@@ -594,12 +617,11 @@ export class DictaAction extends HTMLElement {
       this.#setView("confirmation", [
         ...elements,
         this.#button("continue", () => {
-          request.confirming = false;
+          request.phase = "running";
           this.#showWorking(label);
           resolve(true);
         }),
         this.#button("cancel", () => {
-          request.confirming = false;
           this.#cancel();
           resolve(false);
         }),

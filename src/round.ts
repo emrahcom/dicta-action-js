@@ -18,7 +18,7 @@ const TIMEOUT_MS = 60_000;
 // A round that ends the request as an error. The message names the cause.
 export class RoundError extends Error {}
 
-export type Round = {
+type Round = {
   requestId?: string;
   text: string;
   exchange: unknown[];

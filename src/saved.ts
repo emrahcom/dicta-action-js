@@ -5,7 +5,7 @@ import type { Report } from "./run.ts";
 
 const KEY = "dicta-action-saved";
 
-export type Saved = {
+type Saved = {
   // Milliseconds since 1970, for the 60 second check.
   savedAt: number;
   requestId: string;
