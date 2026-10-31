@@ -21,6 +21,9 @@ the site's capability functions, with the user's own rights.
 - Independent of where the text comes from: `dicta-js`, a plain text field or
   anything else. The application passes the text in.
 - Independent of UI frameworks: it works in any web page.
+- Accessible as a first-class feature: everything a sighted user sees or does is
+  available to keyboard and screen reader users (`architecture.md`,
+  Accessibility).
 
 ## What it is not
 
