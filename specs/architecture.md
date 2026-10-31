@@ -218,9 +218,8 @@ The element meets WCAG 2.2 level AA.
 - Everything works by keyboard, with a visible focus indicator.
 - The element never takes the focus from outside it. A new view does not take it
   from the site's text field, so Enter there can never press Continue.
-- When a view goes away while the focus is in it, the focus moves to the same
-  place in the next view, such as its Cancel, so a keyboard user keeps their
-  place.
+- When a view goes away while the focus is in it, the focus moves to the next
+  view's Cancel or Close.
 - Progress, questions, confirmations, outcomes and notices are announced through
   a status region, which is separate from the visible parts, so hiding a part
   does not silence it.
