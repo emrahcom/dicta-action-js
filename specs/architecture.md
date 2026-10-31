@@ -61,7 +61,8 @@ CSS parts let the integrator style or hide each part of the element:
 
 - `working`, `question`, `confirmation`: each view as a whole (Display).
 - `label`: the plan's label and the progress indicator.
-- `message`: the text of a question, a stop, an info or an error.
+- `question-text`: the question's text.
+- `stop`, `error`, `info`: each as a whole, with its text and its Close button.
 - `notice`: a notice (Display).
 - `option`: each option button of a question.
 - `confirm`: the confirmation texts and the hint.
