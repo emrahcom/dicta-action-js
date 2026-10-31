@@ -101,7 +101,7 @@ developers.
 The element shows little: the user wants the task done, not to read.
 
 From the submit until the request ends, the element shows one view at a time,
-and each view has a Cancel button in the same place:
+and each view has its own Cancel button, placed to fit the view:
 
 - Working, while the element waits for the server or runs a plan: a progress
   indicator, with the label of the running plan when it has one, and Cancel.
