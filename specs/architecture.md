@@ -46,8 +46,8 @@ names them without the repo.
   without `Authorization`, for a server with authentication turned off.
 - `notice-duration`: how long a notice is shown (Display), in seconds, a whole
   number from 1, by default 5. Another value is ignored, and 5 applies.
-- `texts`: an optional object that overrides the element's own texts by key
-  (Texts).
+- `strings`: an optional object that overrides the element's own strings by key
+  (Strings).
 - `submit(text)`: a method that passes the user's text. The text is trimmed;
   empty text is ignored. What it does depends on the request (Requests).
 
@@ -88,7 +88,7 @@ The element runs one request at a time. `submit(text)`:
 - With no request running: starts a new request.
 - While a question is open: answers it.
 - While a confirmation is open: is ignored, and the element shows the hint
-  "Click Continue or Cancel" (Texts) until the confirmation ends.
+  "Click Continue or Cancel" (Strings) until the confirmation ends.
 - While the element waits for the server or runs a plan: is added text
   (`contract-protocol.md`, Added text and cancel). The client takes all text
   that comes; background speech from an always-open microphone is a known open
@@ -183,10 +183,10 @@ takes it out and goes on or ends it (`contract-protocol.md`, Page changes).
 (`contract-capability.md`, Built-in capabilities), with `args` and `output`
 schemas. They read `dicta-action-history` directly, so they need no element.
 
-## Texts
+## Strings
 
-The element's own texts are English. `texts` overrides any of them by key, for
-example with the site's own translations:
+The element's own strings are English. `strings` overrides any of them by key,
+for example with the site's own translations:
 
 - `continue`: "Continue"
 - `cancel`: "Cancel"
@@ -195,9 +195,9 @@ example with the site's own translations:
 - `error`: "Something went wrong"
 - `tooLong`: "The text is too long"
 
-A key left out keeps its English text. An unknown key, or a value that is not a
-string, is ignored. The element reads `texts` each time it shows a text, so a
-site that changes its language sets `texts` again.
+A key left out keeps its English string. An unknown key, or a value that is not
+a string, is ignored. The element reads `strings` each time it shows one, so a
+site that changes its language sets `strings` again.
 
 Texts from the server and from the module's `confirm` are shown as they come.
 
