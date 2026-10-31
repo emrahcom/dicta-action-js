@@ -14,6 +14,10 @@ the site's capability functions, with the user's own rights.
 - A plan runner: it checks each plan, resolves its references, runs its steps
   and loops by calling the site's own functions, and reports the outputs the
   plan asks for. It never runs code it receives.
+- The home of the built-in capabilities, `dicta.listHistory` and
+  `dicta.getHistory`, exported as `dictaCapabilities`, and of the history they
+  read: the finished requests of the tab, kept in its session storage
+  (`contract-capability.md` in `dicta-action-server`, Built-in capabilities).
 - Independent of where the text comes from: `dicta-js`, a plain text field or
   anything else. The application passes the text in.
 - Independent of UI frameworks: it works in any web page.
@@ -28,12 +32,17 @@ the site's capability functions, with the user's own rights.
 ## First version
 
 - The site registers its capability module (`contract-capability.md` in
-  `dicta-action-server`) and a token function.
+  `dicta-action-server`) and, when the server checks tokens, a token function.
 - The application passes a request as text. The element runs it with the server
-  round by round, until the server replies with done, a stop or an info.
+  round by round, until the server replies with done, a stop or an info, or the
+  request ends by cancel, an error or a page change.
+- Text the application passes while a request runs is added text: it interrupts
+  the plan, and the server decides what comes next (`contract-protocol.md` in
+  `dicta-action-server`, Added text and cancel).
 - Before a risky step, the user clicks Continue or Cancel: a destructive or
-  external step, or a `forEach` of write calls over more items than the module's
-  `confirmOver` (`contract-plan.md` in `dicta-action-server`, Confirmation).
+  external step, or a `forEach` with a write call and more items than the
+  module's `confirmOver` (`contract-plan.md` in `dicta-action-server`,
+  Confirmation).
 - A question from the server is shown with its options as buttons. While a
   question is open, the next text the application passes is the answer.
 - Everything shown is short: the user wants the task done, not to read. Only an
