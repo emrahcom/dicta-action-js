@@ -27,8 +27,6 @@ export type Plan = {
   final?: boolean;
 };
 
-export class BadPlan extends Error {}
-
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -40,7 +38,7 @@ function onlyKeys(
 ) {
   for (const key of Object.keys(value)) {
     if (!keys.includes(key)) {
-      throw new BadPlan(`${path} has ${key}, which is not allowed`);
+      throw new Error(`${path} has ${key}, which is not allowed`);
     }
   }
 }
@@ -62,20 +60,20 @@ type Scope = { earlierSteps: number; inForEach: boolean };
 function checkReference(ref: string, scope: Scope, path: string) {
   const [head = "", ...rest] = ref.slice(1).split(".");
   if (rest.some((part) => part === "")) {
-    throw new BadPlan(`${path}: ${ref} has an empty path part`);
+    throw new Error(`${path}: ${ref} has an empty path part`);
   }
   if (/^\d+$/.test(head)) {
     const step = Number(head);
     if (step < 1 || step > scope.earlierSteps) {
-      throw new BadPlan(`${path}: ${ref} does not point to an earlier step`);
+      throw new Error(`${path}: ${ref} does not point to an earlier step`);
     }
     return;
   }
   if (head !== "item") {
-    throw new BadPlan(`${path}: ${ref} is not a step number or $item`);
+    throw new Error(`${path}: ${ref} is not a step number or $item`);
   }
   if (!scope.inForEach) {
-    throw new BadPlan(`${path}: ${ref} is used outside a forEach`);
+    throw new Error(`${path}: ${ref} is used outside a forEach`);
   }
 }
 
@@ -126,7 +124,7 @@ function matches(
     return;
   }
   if (schema.type !== undefined && !hasType(value, schema.type)) {
-    throw new BadPlan(`${path} must be of type ${schema.type}`);
+    throw new Error(`${path} must be of type ${schema.type}`);
   }
   if (
     schema.enum !== undefined &&
@@ -134,13 +132,13 @@ function matches(
       (option) => JSON.stringify(option) === JSON.stringify(value),
     )
   ) {
-    throw new BadPlan(`${path} is not one of the allowed values`);
+    throw new Error(`${path} is not one of the allowed values`);
   }
   if (isObject(value)) {
     // Only own properties count, never inherited ones such as __proto__.
     for (const name of schema.required ?? []) {
       if (!Object.hasOwn(value, name)) {
-        throw new BadPlan(`${path}.${name} is required`);
+        throw new Error(`${path}.${name} is required`);
       }
     }
     // A property the schema does not name is refused, also when it names none
@@ -148,7 +146,7 @@ function matches(
     const properties = schema.properties ?? {};
     for (const name of Object.keys(value)) {
       if (!Object.hasOwn(properties, name)) {
-        throw new BadPlan(`${path}.${name} is not in the schema`);
+        throw new Error(`${path}.${name} is not in the schema`);
       }
     }
     for (const [name, property] of Object.entries(properties)) {
@@ -175,7 +173,7 @@ export function checkArgs(
 ) {
   if (schema === undefined) {
     if (Object.keys(args).length > 0) {
-      throw new BadPlan(`${path} must be {}`);
+      throw new Error(`${path} must be {}`);
     }
     return;
   }
@@ -187,7 +185,7 @@ function checkIncludeOutput(step: Record<string, unknown>, path: string) {
     step.includeOutput !== undefined &&
     typeof step.includeOutput !== "boolean"
   ) {
-    throw new BadPlan(`${path}.includeOutput must be true or false`);
+    throw new Error(`${path}.includeOutput must be true or false`);
   }
 }
 
@@ -206,29 +204,29 @@ function checkCall(
   checkIncludeOutput(step, path);
   const capability = context.capabilities.find((c) => c.name === step.call);
   if (!capability) {
-    throw new BadPlan(`${path}.call names no capability: ${String(step.call)}`);
+    throw new Error(`${path}.call names no capability: ${String(step.call)}`);
   }
   if (!isObject(step.args)) {
-    throw new BadPlan(`${path}.args must be an object`);
+    throw new Error(`${path}.args must be an object`);
   }
   checkReferences(step.args, scope, `${path}.args`);
   checkArgs(step.args, capability.args, `${path}.args`, true);
 }
 
-// Checks a plan from the server. Throws BadPlan with the reason.
+// Checks a plan from the server. Throws an error with the reason.
 export function checkPlan(
   plan: unknown,
   context: SiteContext,
 ): asserts plan is Plan {
   if (!isObject(plan)) {
-    throw new BadPlan("the plan must be an object");
+    throw new Error("the plan must be an object");
   }
   if (new TextEncoder().encode(JSON.stringify(plan)).length > MAX_BYTES) {
-    throw new BadPlan("a plan is at most 16 KB");
+    throw new Error("a plan is at most 16 KB");
   }
   onlyKeys(plan, ["steps", "text", "final"], "plan");
   if (plan.text !== undefined && typeof plan.text !== "string") {
-    throw new BadPlan("text must be a string");
+    throw new Error("text must be a string");
   }
   // Characters are Unicode code points, as for every text (contract-plan.md,
   // Limits).
@@ -236,45 +234,45 @@ export function checkPlan(
     typeof plan.text === "string" &&
     Array.from(plan.text).length > MAX_LABEL_CHARS
   ) {
-    throw new BadPlan(`text is longer than ${MAX_LABEL_CHARS} characters`);
+    throw new Error(`text is longer than ${MAX_LABEL_CHARS} characters`);
   }
   if (plan.final !== undefined && typeof plan.final !== "boolean") {
-    throw new BadPlan("final must be true or false");
+    throw new Error("final must be true or false");
   }
   if (!Array.isArray(plan.steps)) {
-    throw new BadPlan("steps must be an array");
+    throw new Error("steps must be an array");
   }
   const steps: unknown[] = plan.steps;
   if (steps.length > MAX_STEPS) {
-    throw new BadPlan(`a plan has at most ${MAX_STEPS} steps`);
+    throw new Error(`a plan has at most ${MAX_STEPS} steps`);
   }
   steps.forEach((step, i) => {
     const path = `steps[${i}]`;
     const scope: Scope = { earlierSteps: i, inForEach: false };
     if (!isObject(step)) {
-      throw new BadPlan(`${path} must be an object`);
+      throw new Error(`${path} must be an object`);
     }
     if (Object.hasOwn(step, "call")) {
       checkCall(step, context, scope, path);
       return;
     }
     if (!Object.hasOwn(step, "forEach")) {
-      throw new BadPlan(`${path} must be a call or a forEach`);
+      throw new Error(`${path} must be a call or a forEach`);
     }
     onlyKeys(step, ["forEach", "do", "includeOutput"], path);
     checkIncludeOutput(step, path);
     if (!isReference(step.forEach) || !/^\$\d/.test(step.forEach)) {
-      throw new BadPlan(`${path}.forEach must refer to an earlier step`);
+      throw new Error(`${path}.forEach must refer to an earlier step`);
     }
     checkReference(step.forEach, scope, `${path}.forEach`);
     if (!Array.isArray(step.do)) {
-      throw new BadPlan(`${path}.do must be an array`);
+      throw new Error(`${path}.do must be an array`);
     }
     const inner: Scope = { earlierSteps: i, inForEach: true };
     step.do.forEach((call: unknown, j) => {
       const innerPath = `${path}.do[${j}]`;
       if (!isObject(call) || !Object.hasOwn(call, "call")) {
-        throw new BadPlan(`${innerPath} must be a call`);
+        throw new Error(`${innerPath} must be a call`);
       }
       checkCall(call, context, inner, innerPath);
     });

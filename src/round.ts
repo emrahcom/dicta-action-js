@@ -15,9 +15,6 @@ const REPLY_TYPES = ["plan", "question", "done", "stop", "info"];
 
 const TIMEOUT_MS = 60_000;
 
-// A round that ends the request as an error. The message names the cause.
-export class RoundError extends Error {}
-
 type Round = {
   requestId?: string;
   text: string;
@@ -78,7 +75,7 @@ export class RoundClient {
     try {
       state = await this.#module.state.run();
     } catch (err) {
-      throw new RoundError(`state.run failed: ${message(err)}`, { cause: err });
+      throw new Error(`state.run failed: ${message(err)}`);
     }
     const body = JSON.stringify({
       ...(round.requestId === undefined ? {} : { requestId: round.requestId }),
@@ -103,9 +100,7 @@ export class RoundClient {
       try {
         this.#token = await this.#getToken();
       } catch (err) {
-        throw new RoundError(`getToken failed: ${message(err)}`, {
-          cause: err,
-        });
+        throw new Error(`getToken failed: ${message(err)}`);
       }
     }
     return this.#token;
@@ -136,9 +131,9 @@ export class RoundClient {
       return { status: response.status, json };
     } catch (err) {
       if (controller.signal.aborted) {
-        throw new RoundError("no response after 60 seconds", { cause: err });
+        throw new Error("no response after 60 seconds");
       }
-      throw new RoundError(`network failure: ${message(err)}`, { cause: err });
+      throw new Error(`network failure: ${message(err)}`);
     } finally {
       clearTimeout(timer);
     }
@@ -148,7 +143,7 @@ export class RoundClient {
     const body = (json ?? {}) as Record<string, unknown>;
     if (status !== 200) {
       const error = typeof body.error === "string" ? `: ${body.error}` : "";
-      throw new RoundError(`HTTP ${status}${error}`);
+      throw new Error(`HTTP ${status}${error}`);
     }
     const reply = body.reply as Record<string, unknown> | null | undefined;
     if (
@@ -156,10 +151,10 @@ export class RoundClient {
       typeof reply !== "object" ||
       !reply
     ) {
-      throw new RoundError("the response has no requestId or reply");
+      throw new Error("the response has no requestId or reply");
     }
     if (!REPLY_TYPES.includes(reply.type as string)) {
-      throw new RoundError(`unknown reply type: ${String(reply.type)}`);
+      throw new Error(`unknown reply type: ${String(reply.type)}`);
     }
     return { requestId: body.requestId, reply: reply as Reply };
   }

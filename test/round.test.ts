@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { afterEach, mock, test } from "node:test";
 import { buildContext } from "../src/context.ts";
 import type { CapabilityModule } from "../src/index.ts";
-import { localTime, RoundClient, RoundError } from "../src/round.ts";
+import { localTime, RoundClient } from "../src/round.ts";
 
 const module: CapabilityModule = {
   site: { name: "Teamboard", desc: "A task list." },
@@ -124,7 +124,7 @@ test("a second 401 is an error", async () => {
   );
   await assert.rejects(
     client.send({ text: "a", exchange: [] }),
-    (err) => err instanceof RoundError && err.message === "HTTP 401: bad token",
+    (err) => err instanceof Error && err.message === "HTTP 401: bad token",
   );
 });
 
@@ -138,8 +138,7 @@ test("another HTTP error is an error with the server's error", async () => {
   await assert.rejects(
     client.send({ text: "a", exchange: [] }),
     (err) =>
-      err instanceof RoundError &&
-      err.message === "HTTP 400: context: too large",
+      err instanceof Error && err.message === "HTTP 400: context: too large",
   );
   assert.equal(calls.length, 1);
 });
@@ -158,7 +157,7 @@ test("a network failure is an error, with no retry", async () => {
   await assert.rejects(
     client.send({ text: "a", exchange: [] }),
     (err) =>
-      err instanceof RoundError &&
+      err instanceof Error &&
       err.message === "network failure: Failed to fetch",
   );
   assert.equal(calls.length, 1);
@@ -194,14 +193,16 @@ test("an unknown reply type is an error", async () => {
   await assert.rejects(
     client.send({ text: "a", exchange: [] }),
     (err) =>
-      err instanceof RoundError && err.message === "unknown reply type: dance",
+      err instanceof Error && err.message === "unknown reply type: dance",
   );
 });
 
 test("a response without a reply is an error", async () => {
   fakeFetch(json(200, { requestId: "r1", reply: null }));
   const client = new RoundClient("https://example.com", module);
-  await assert.rejects(client.send({ text: "a", exchange: [] }), RoundError);
+  await assert.rejects(client.send({ text: "a", exchange: [] }), {
+    message: "the response has no requestId or reply",
+  });
 });
 
 test("getToken throwing is an error", async () => {
@@ -212,8 +213,7 @@ test("getToken throwing is an error", async () => {
   await assert.rejects(
     client.send({ text: "a", exchange: [] }),
     (err) =>
-      err instanceof RoundError &&
-      err.message === "getToken failed: backend down",
+      err instanceof Error && err.message === "getToken failed: backend down",
   );
   assert.equal(calls.length, 0);
 });
@@ -233,7 +233,7 @@ test("state.run throwing is an error", async () => {
   await assert.rejects(
     client.send({ text: "a", exchange: [] }),
     (err) =>
-      err instanceof RoundError && err.message === "state.run failed: no page",
+      err instanceof Error && err.message === "state.run failed: no page",
   );
   assert.equal(calls.length, 0);
 });

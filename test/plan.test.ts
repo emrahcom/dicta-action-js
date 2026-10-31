@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { SiteContext } from "../src/context.ts";
-import { BadPlan, checkArgs, checkPlan } from "../src/plan.ts";
+import { checkArgs, checkPlan } from "../src/plan.ts";
 
 const CONTEXT: SiteContext = {
   site: { name: "Teamboard", desc: "A task list." },
@@ -348,10 +348,6 @@ for (const [name, plan, message] of INVALID) {
     assert.throws(() => checkPlan(plan, CONTEXT), { message });
   });
 }
-
-test("refuses with BadPlan", () => {
-  assert.throws(() => checkPlan({}, CONTEXT), BadPlan);
-});
 
 const createArgs = CONTEXT.capabilities.find(
   (c) => c.name === "tasks.create",
