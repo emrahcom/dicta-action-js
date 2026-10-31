@@ -13,7 +13,7 @@ async function openApp(page: Page) {
   );
 }
 
-test("a step that loads a page reports navigated in the new page", async ({
+test("a step that loads a page reports navigated at the next step", async ({
   page,
 }) => {
   const plan = {
@@ -36,7 +36,7 @@ test("a step that loads a page reports navigated in the new page", async ({
         plan,
         report: {
           outputs: { 1: [{ id: "t1" }, { id: "t2" }] },
-          halt: { step: 2, ...navigated },
+          halt: { step: 3, ...navigated },
         },
       },
     ],
@@ -45,6 +45,15 @@ test("a step that loads a page reports navigated in the new page", async ({
   expect(
     await page.evaluate(() => sessionStorage.getItem("dicta-action-saved")),
   ).toBeNull();
+});
+
+test("a page load as the last step has no halt", async ({ page }) => {
+  const plan = { steps: [list, { call: "page.reload", args: {} }] };
+  const bodies = await replies(page, { type: "plan", plan }, { type: "done" });
+  await openApp(page);
+  await submit(page, "reload");
+  await expect.poll(() => bodies.length, { timeout: 10_000 }).toBe(2);
+  expect(bodies[1].exchange).toEqual([{ plan, report: {} }]);
 });
 
 test("a page load in a forEach reports its item and call", async ({ page }) => {
@@ -66,7 +75,7 @@ test("a page load in a forEach reports its item and call", async ({ page }) => {
     {
       plan,
       report: {
-        halt: { step: 2, ...navigated, item: 0, do: 0, outputs: [[]] },
+        halt: { step: 2, ...navigated, item: 1, do: 0, outputs: [[null], []] },
       },
     },
   ]);
@@ -89,9 +98,8 @@ test("a saved request older than 60 seconds ends as cancelled", async ({
       savedAt: Date.now() - 61_000,
       requestId: "r5",
       text: "old",
-      exchange: [],
-      plan,
-      report: { halt: { step: 1, ...navigated } },
+      exchange: [{ plan, report: { halt: { step: 1, ...navigated } } }],
+      added: ["and more"],
     },
   );
   await openApp(page);
@@ -99,7 +107,10 @@ test("a saved request older than 60 seconds ends as cancelled", async ({
   expect((await history(page))[0]).toMatchObject({
     requestId: "r5",
     outcome: { type: "cancelled" },
-    exchange: [{ plan, report: { halt: { step: 1, ...navigated } } }],
+    exchange: [
+      { plan, report: { halt: { step: 1, ...navigated } } },
+      { added: "and more" },
+    ],
   });
   expect(rounds).toBe(0);
 });
@@ -181,4 +192,69 @@ test("a failed round while leaving is an error when the page stays", async ({
   await expect(page.locator('[part~="text"]')).toHaveText(
     "Something went wrong",
   );
+});
+
+test("text from before the page load goes on in the new page", async ({
+  page,
+}) => {
+  const plan = { steps: [{ call: "page.reloadLater", args: {} }] };
+  const bodies = await replies(page, { type: "plan", plan }, { type: "done" });
+  await openApp(page);
+  await submit(page, "reload");
+  await page.waitForFunction(() => "release" in window);
+  await submit(page, "and more");
+  await page.evaluate(() =>
+    (window as unknown as { release: () => void }).release(),
+  );
+  await expect.poll(() => bodies.length, { timeout: 10_000 }).toBe(2);
+  expect(bodies[1].exchange).toEqual([
+    { plan, report: {} },
+    { added: "and more" },
+  ]);
+});
+
+test("after Stay at the leave prompt text is ignored until Cancel", async ({
+  page,
+}) => {
+  const plan = { steps: [{ call: "page.reload", args: {} }, list] };
+  const bodies = await replies(page, { type: "plan", plan });
+  await openApp(page);
+  // The leave prompt needs a click on the page first; Stay dismisses it.
+  await page.evaluate(() =>
+    addEventListener("beforeunload", (event) => event.preventDefault()),
+  );
+  await page.mouse.click(1, 1);
+  page.on("dialog", (dialog) => void dialog.dismiss());
+  await submit(page, "go");
+  await expect.poll(() => bodies.length).toBe(1);
+  await expect(page.locator('[part~="indicator"]')).toBeVisible();
+  await submit(page, "and more");
+  await expect(page.locator('[part~="notice"]')).toHaveText(
+    "Wait for the page to load",
+  );
+  // The plan does not go on and no round is sent.
+  await page.waitForTimeout(300);
+  expect(bodies.length).toBe(1);
+  await page.getByRole("button", { name: "Cancel" }).click();
+  await expect(page.locator('[part~="view"]')).toBeHidden();
+  expect((await history(page))[0]).toMatchObject({
+    outcome: { type: "cancelled" },
+    exchange: [{ plan, report: { halt: { step: 2, ...navigated } } }],
+  });
+});
+
+test("a hash change does not stop the plan", async ({ page }) => {
+  const plan = {
+    steps: [
+      { call: "page.hash", args: {} },
+      { ...list, includeOutput: true },
+    ],
+  };
+  const bodies = await replies(page, { type: "plan", plan }, { type: "done" });
+  await openApp(page);
+  await submit(page, "top");
+  await expect.poll(() => bodies.length).toBe(2);
+  expect(bodies[1].exchange).toEqual([
+    { plan, report: { outputs: { 2: [{ id: "t1" }, { id: "t2" }] } } },
+  ]);
 });

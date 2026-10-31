@@ -1,5 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
-import { deleted, openPage, replies, submit } from "./page.ts";
+import { deleted, holdStep, openPage, replies, submit } from "./page.ts";
 
 const done = { type: "done" };
 const text = '[part~="text"]';
@@ -141,13 +141,7 @@ test("the focus moves from Continue to the working view's Cancel", async ({
   await replies(page, deleteOne);
   await openPage(page);
   // The step is held, so the working view stays after Continue.
-  await page.evaluate(() => {
-    const element = document.querySelector("dicta-action") as unknown as {
-      module: { capabilities: Record<string, { run: () => Promise<unknown> }> };
-    };
-    element.module.capabilities["tasks.delete"].run = () =>
-      new Promise(() => {});
-  });
+  await holdStep(page, "tasks.delete");
   await submit(page, "delete it");
   await page.getByRole("button", { name: "Continue" }).focus();
   await page.keyboard.press("Enter");

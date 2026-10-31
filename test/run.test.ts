@@ -98,7 +98,14 @@ async function ask(confirmation: Confirmation) {
 async function run(plan: Plan, using = module) {
   calls.length = 0;
   asked.length = 0;
-  return runPlan(plan, using, ask, () => undefined, newProgress());
+  return runPlan(
+    plan,
+    using,
+    ask,
+    () => undefined,
+    newProgress(),
+    () => false,
+  );
 }
 
 const list = { call: "tasks.list", args: {} };
@@ -542,6 +549,7 @@ test("a stop before a step halts there", async () => {
     ask,
     stopAt(2, "interrupted"),
     newProgress(),
+    () => false,
   );
   assert.deepEqual(report.halt, {
     step: 2,
@@ -572,6 +580,7 @@ test("a stop in a forEach halts at the next item, without do", async () => {
     ask,
     stopAt(3, "cancelled"),
     newProgress(),
+    () => false,
   );
   assert.deepEqual(report.halt, {
     step: 2,
@@ -600,6 +609,7 @@ test("a forEach stopped between items without includeOutput", async () => {
     ask,
     stopAt(3, "interrupted"),
     newProgress(),
+    () => false,
   );
   assert.equal(report.halt?.item, 1);
   assert.equal(Object.hasOwn(report.halt ?? {}, "outputs"), false);
@@ -613,6 +623,7 @@ test("a stop after the last step does not halt", async () => {
     ask,
     stopAt(2, "interrupted"),
     newProgress(),
+    () => false,
   );
   assert.deepEqual(report, {});
 });
@@ -646,6 +657,7 @@ test("the report so far halts at the running step with its outputs", async () =>
     ask,
     () => undefined,
     progress,
+    () => false,
   );
   assert.equal(running, true);
   assert.equal(progress.running, false);
@@ -690,6 +702,7 @@ test("the report so far in a forEach has its item, call and outputs", async () =
     ask,
     () => undefined,
     progress,
+    () => false,
   );
   assert.deepEqual(soFar, {
     halt: {
@@ -701,4 +714,118 @@ test("the report so far in a forEach has its item, call and outputs", async () =
       outputs: [[{ id: "t1" }, { id: "t1" }], [{ id: "t2" }]],
     },
   });
+});
+
+// A page load during a step (contract-protocol.md, Page changes).
+
+// Runs a plan whose page.open starts a page load when its id is `at`.
+async function runWithPageLoad(plan: Plan, at = "t1") {
+  calls.length = 0;
+  let loading = false;
+  const loads = moduleWith({
+    ...module.capabilities,
+    "page.open": {
+      level: "write",
+      desc: "Opens a page.",
+      args: { type: "object", properties: { id: { type: "string" } } },
+      run: async (args) => {
+        calls.push(["page.open", args]);
+        loading ||= args.id === at;
+        return { id: args.id };
+      },
+    },
+  });
+  return runPlan(
+    plan,
+    loads,
+    ask,
+    () => undefined,
+    newProgress(),
+    () => loading,
+  );
+}
+
+const navigated = { code: "navigated", message: "The page changed" };
+const open = { call: "page.open", args: { id: "t1" } };
+
+test("a page load halts at the next step with the outputs so far", async () => {
+  const report = await runWithPageLoad({
+    steps: [
+      { ...list, includeOutput: true },
+      { ...open, includeOutput: true },
+      list,
+    ],
+  });
+  assert.deepEqual(report, {
+    outputs: { 1: TASKS, 2: { id: "t1" } },
+    halt: { step: 3, ...navigated },
+  });
+  assert.equal(calls.length, 2);
+});
+
+test("a page load in the last step has no halt", async () => {
+  const report = await runWithPageLoad({ steps: [list, open] });
+  assert.deepEqual(report, {});
+});
+
+test("a page load in a forEach halts at the next call", async () => {
+  const report = await runWithPageLoad({
+    steps: [
+      list,
+      {
+        forEach: "$1",
+        do: [
+          { call: "page.open", args: { id: "$item.id" } },
+          { call: "tasks.update", args: { id: "$item.id" } },
+        ],
+        includeOutput: true,
+      },
+    ],
+  });
+  assert.deepEqual(report.halt, {
+    step: 2,
+    ...navigated,
+    item: 0,
+    do: 1,
+    outputs: [[{ id: "t1" }]],
+  });
+  assert.equal(calls.length, 2);
+});
+
+test("a page load at the end of an item halts at the next item", async () => {
+  const report = await runWithPageLoad({
+    steps: [
+      list,
+      {
+        forEach: "$1",
+        do: [{ call: "page.open", args: { id: "$item.id" } }],
+        includeOutput: true,
+      },
+    ],
+  });
+  assert.deepEqual(report.halt, {
+    step: 2,
+    ...navigated,
+    item: 1,
+    do: 0,
+    outputs: [[{ id: "t1" }], []],
+  });
+});
+
+test("a page load at the end of a forEach halts at the next step", async () => {
+  const report = await runWithPageLoad(
+    {
+      steps: [
+        list,
+        {
+          forEach: "$1",
+          do: [{ call: "page.open", args: { id: "$item.id" } }],
+        },
+        list,
+      ],
+    },
+    "t2",
+  );
+  assert.deepEqual(report.halt, { step: 3, ...navigated });
+  assert.equal(calls.length, 3);
 });

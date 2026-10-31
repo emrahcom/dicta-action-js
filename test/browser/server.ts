@@ -47,9 +47,24 @@ const APP_PAGE = `<!doctype html>
         level: "write",
         desc: "Loads the page again; steps after it do not run.",
         args: { type: "object", properties: { id: { type: "string" } } },
-        run: () => {
+        run: async () => {
           location.reload();
-          return new Promise(() => {});
+        },
+      },
+      // Waits for window.release() before it loads the page again.
+      "page.reloadLater": {
+        level: "write",
+        desc: "Loads the page again later; steps after it do not run.",
+        run: async () => {
+          await new Promise((resolve) => (window.release = resolve));
+          location.reload();
+        },
+      },
+      "page.hash": {
+        level: "write",
+        desc: "Changes the hash.",
+        run: async () => {
+          location.hash = "#top";
         },
       },
     },

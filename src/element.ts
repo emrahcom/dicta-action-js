@@ -21,8 +21,9 @@ import { saveRequest, takeSaved } from "./saved.ts";
 type View = "working" | "question" | "confirmation" | "stop" | "error" | "info";
 
 // Where a running request is: waiting for the server, a question open, a plan
-// running, or a confirmation open in that plan.
-type Phase = "waiting" | "question" | "running" | "confirmation";
+// running, a confirmation open in that plan, or waiting for the page to be
+// left after a page load started during a step.
+type Phase = "waiting" | "question" | "running" | "confirmation" | "pageLoad";
 
 // A running user request (contract-protocol.md, Request body).
 type Request = {
@@ -37,6 +38,9 @@ type Request = {
   // The running plan and where it is, for a page change.
   plan?: unknown;
   progress?: Progress;
+  // Set when a page load started while the plan ran; text is then ignored
+  // (contract-protocol.md, Page changes).
+  pageLoad?: boolean;
   // Set when the page was left; the request is saved or stored already.
   left?: boolean;
 };
@@ -62,6 +66,7 @@ const STRINGS = {
   done: "Done",
   error: "Something went wrong",
   items: "{count} items",
+  pageLoad: "Wait for the page to load",
   tooLong: "The text is too long",
   // Announced only, never shown.
   working: "Working",
@@ -143,6 +148,11 @@ const STYLE = `
     white-space: nowrap;
   }
 `;
+
+// The browser's Navigation API, when it has one.
+function navigationApi(): EventTarget | undefined {
+  return (window as unknown as { navigation?: EventTarget }).navigation;
+}
 
 export class DictaAction extends HTMLElement {
   // Set by the application; see specs/architecture.md (Element).
@@ -236,6 +246,7 @@ export class DictaAction extends HTMLElement {
     window.addEventListener("beforeunload", this.#onBeforeUnload);
     window.addEventListener("pagehide", this.#onPageHide);
     window.addEventListener("pageshow", this.#onPageShow);
+    navigationApi()?.addEventListener("navigate", this.#onNavigate);
     this.#resume();
   }
 
@@ -243,7 +254,21 @@ export class DictaAction extends HTMLElement {
     window.removeEventListener("beforeunload", this.#onBeforeUnload);
     window.removeEventListener("pagehide", this.#onPageHide);
     window.removeEventListener("pageshow", this.#onPageShow);
+    navigationApi()?.removeEventListener("navigate", this.#onNavigate);
   }
+
+  // A page load, to another document, that starts while a plan runs
+  // (specs/architecture.md, Plan runner). Without the Navigation API it is not
+  // seen.
+  #onNavigate = (event: Event) => {
+    const request = this.#request;
+    const { destination } = event as Event & {
+      destination: { sameDocument: boolean };
+    };
+    if (request?.phase === "running" && !destination.sameDocument) {
+      request.pageLoad = true;
+    }
+  };
 
   // Browsers abort a pending round when a page load starts, after
   // beforeunload and before pagehide; that is a page change, not an error.
@@ -281,25 +306,20 @@ export class DictaAction extends HTMLElement {
   };
 
   // The page is left in the middle of a request: it goes on in the new page
-  // only if a step runs; otherwise it ends as cancelled, with everything done
-  // so far (contract-protocol.md, Page changes).
+  // only if it waits for this page load; otherwise it ends as cancelled, with
+  // everything done so far (contract-protocol.md, Page changes).
   #leave(request: Request) {
-    const { progress, plan } = request;
-    if (
-      request.phase === "running" &&
-      progress?.running &&
-      request.requestId !== undefined
-    ) {
+    if (request.phase === "pageLoad" && request.requestId !== undefined) {
       saveRequest({
         savedAt: Date.now(),
         requestId: request.requestId,
         text: request.text,
         exchange: request.exchange,
-        plan,
-        report: reportSoFar(progress, "navigated", "The page changed"),
+        added: request.added,
       });
       return;
     }
+    const { progress, plan } = request;
     if (progress !== undefined && planRuns(request)) {
       // A report not sent yet goes into the history too.
       request.exchange.push({
@@ -311,8 +331,8 @@ export class DictaAction extends HTMLElement {
   }
 
   // Takes a saved request out once the element has its server and module. A
-  // recent one goes on with its report in the next round, which sends the new
-  // page's state; an older one ends as cancelled.
+  // recent one goes on with its report and added text in the next round, which
+  // sends the new page's state; an older one ends as cancelled.
   #resume() {
     if (
       this.#request !== undefined ||
@@ -328,10 +348,11 @@ export class DictaAction extends HTMLElement {
     const request: Request = {
       text: saved.text,
       requestId: saved.requestId,
-      exchange: [...saved.exchange, { plan: saved.plan, report: saved.report }],
+      exchange: [...saved.exchange],
       phase: "waiting",
-      added: [],
+      added: saved.added,
     };
+    this.#takeAdded(request);
     if (Date.now() - saved.savedAt > SAVED_MS) {
       this.#store(request, { type: "cancelled" });
       return;
@@ -351,7 +372,11 @@ export class DictaAction extends HTMLElement {
       return;
     }
     const request = this.#request;
-    if (request === undefined) {
+    if (request?.pageLoad) {
+      // From the start of a page load until the page is left, text is ignored
+      // (contract-protocol.md, Page changes).
+      this.#showNotice(this.#string("pageLoad"));
+    } else if (request === undefined) {
       this.#hideNotice();
       this.#request = {
         text: trimmed,
@@ -488,6 +513,11 @@ export class DictaAction extends HTMLElement {
             return request.added.length > 0 ? "interrupted" : undefined;
           },
           request.progress,
+          async () => {
+            // WebKit fires navigate for location.reload() a task later.
+            await new Promise((resolve) => setTimeout(resolve, 0));
+            return this.#request === request && request.pageLoad === true;
+          },
         );
       }
     } catch (err) {
@@ -506,6 +536,11 @@ export class DictaAction extends HTMLElement {
       if (!request.left) {
         this.#store(request, { type: "cancelled" });
       }
+      return;
+    }
+    if (request.pageLoad) {
+      // The report waits, with the working view, for the page to be left.
+      request.phase = "pageLoad";
       return;
     }
     // Text that came after the last step follows the report without a halt.
@@ -568,12 +603,16 @@ export class DictaAction extends HTMLElement {
   }
 
   // Ends the request. While a plan runs, the running step finishes first and
-  // the request is stored with its last report (#runPlan).
+  // the request is stored with its last report (#runPlan). While it waits for
+  // a page load, it is stored with the report it holds and its added text.
   #cancel() {
     const request = this.#request;
     this.#request = undefined;
     this.#hideView();
     if (request !== undefined && !planRuns(request)) {
+      if (request.phase === "pageLoad") {
+        this.#takeAdded(request);
+      }
       this.#store(request, { type: "cancelled" });
     }
   }

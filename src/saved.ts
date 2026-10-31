@@ -1,7 +1,5 @@
-// The request saved when the page is left while a step runs, for the next
-// page to go on with (contract-protocol.md, Page changes).
-
-import type { Report } from "./run.ts";
+// The request saved when the page is left while it waits for a page load, for
+// the next page to go on with (contract-protocol.md, Page changes).
 
 const KEY = "dicta-action-saved";
 
@@ -10,10 +8,11 @@ type Saved = {
   savedAt: number;
   requestId: string;
   text: string;
+  // Ends with the plan and its report, with the halt code `navigated` at the
+  // first step that did not run, or no halt.
   exchange: unknown[];
-  plan: unknown;
-  // The report so far, with the halt code `navigated` at the running step.
-  report: Report;
+  // Text the user added before the page load started.
+  added: string[];
 };
 
 export function saveRequest(saved: Saved) {

@@ -52,11 +52,15 @@ test("after pagehide a failed round is an error at once", async ({ page }) => {
 const saved = {
   requestId: "r3",
   text: "open the task",
-  exchange: [],
-  plan: { steps: [{ call: "tasks.list", args: {} }] },
-  report: {
-    halt: { step: 1, code: "navigated", message: "The page changed" },
-  },
+  exchange: [
+    {
+      plan: { steps: [{ call: "tasks.list", args: {} }] },
+      report: {
+        halt: { step: 1, code: "navigated", message: "The page changed" },
+      },
+    },
+  ],
+  added: [],
 };
 
 test("pageshow from the cache goes on with a saved request", async ({
@@ -75,7 +79,7 @@ test("pageshow from the cache goes on with a saved request", async ({
   expect(bodies[0]).toMatchObject({
     requestId: "r3",
     text: "open the task",
-    exchange: [{ plan: saved.plan, report: saved.report }],
+    exchange: saved.exchange,
   });
 });
 

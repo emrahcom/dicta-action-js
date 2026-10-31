@@ -180,6 +180,10 @@ function stopHalt(step: number, code: Stop): Halt {
   return { step, code, message: STOP_MESSAGES[code] };
 }
 
+// A page load started during a step: nothing after it runs
+// (contract-protocol.md, Page changes).
+const NAVIGATED_MESSAGE = "The page changed";
+
 const SHOWN_ITEMS = 3;
 const DEFAULT_CONFIRM_OVER = 10;
 
@@ -211,7 +215,7 @@ export function newProgress(): Progress {
 }
 
 // The report of a plan stopped where it is now, with the halt `code`, for a
-// page change: the running step may or may not have finished.
+// page left while a step runs: that step may or may not have finished.
 export function reportSoFar(
   progress: Progress,
   code: string,
@@ -232,13 +236,17 @@ export function reportSoFar(
 // Runs a plan that passed checkPlan and returns its report. When the user
 // cancels at a confirmation, the halt has the code `cancelled`. `stop` is
 // asked between steps, and in a forEach between items; a step or an item that
-// started always finishes.
+// started always finishes. `pageLoad` is asked after each step, and in a
+// forEach after each call: when a page load started, nothing after it runs and
+// the halt has the code `navigated` at the first step, item or call left, or
+// there is no halt when none is left.
 export async function runPlan(
   plan: Plan,
   module: CapabilityModule,
   ask: Ask,
   stop: () => Stop | undefined,
   progress: Progress,
+  pageLoad: () => boolean | Promise<boolean>,
 ): Promise<Report> {
   const outputs: unknown[] = [];
   const included = progress.included;
@@ -347,6 +355,21 @@ export async function runPlan(
               }
               throw err;
             }
+            const lastCall = j === step.do.length - 1;
+            if (!(lastCall && k === items.length - 1) && (await pageLoad())) {
+              // The next call, or the first call of the next item.
+              halt = {
+                step: number,
+                code: "navigated",
+                message: NAVIGATED_MESSAGE,
+                item: lastCall ? k + 1 : k,
+                do: lastCall ? 0 : j + 1,
+              };
+              if (step.includeOutput) {
+                halt.outputs = lastCall ? [...output, []] : output;
+              }
+              throw new Stopped();
+            }
           }
         }
         outputs.push(output);
@@ -363,6 +386,16 @@ export async function runPlan(
     }
     if (step.includeOutput) {
       included.push([number, outputs[i]]);
+    }
+    if (await pageLoad()) {
+      if (number < plan.steps.length) {
+        halt = {
+          step: number + 1,
+          code: "navigated",
+          message: NAVIGATED_MESSAGE,
+        };
+      }
+      break;
     }
   }
   return report(included, halt);
