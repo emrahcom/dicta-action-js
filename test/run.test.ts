@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { CapabilityModule } from "../src/index.ts";
 import type { Plan } from "../src/plan.ts";
-import { type Confirmation, runPlan } from "../src/run.ts";
+import { type Confirmation, runPlan, type Stop } from "../src/run.ts";
 
 type Args = Record<string, unknown>;
 
@@ -515,4 +515,94 @@ test("a bad item halts the forEach before the user is asked", async () => {
   assert.equal(report.halt?.item, undefined);
   assert.deepEqual(asked, []);
   assert.deepEqual(calls, []);
+});
+
+// Added text and cancel (contract-protocol.md, Added text and cancel).
+
+// A stop that answers `value` from the given call on, counting from 1.
+function stopAt(call: number, value: Stop) {
+  let count = 0;
+  return () => {
+    count += 1;
+    return count >= call ? value : undefined;
+  };
+}
+
+test("a stop before a step halts there", async () => {
+  calls.length = 0;
+  const report = await runPlan(
+    { steps: [list, list, list] },
+    module,
+    ask,
+    stopAt(2, "interrupted"),
+  );
+  assert.deepEqual(report.halt, {
+    step: 2,
+    code: "interrupted",
+    message: "The user added text",
+  });
+  assert.equal(calls.length, 1);
+});
+
+test("a stop in a forEach halts at the next item, without do", async () => {
+  calls.length = 0;
+  // Asked before steps 1 and 2, then before item 1 of step 2.
+  const report = await runPlan(
+    {
+      steps: [
+        list,
+        {
+          forEach: "$1",
+          do: [
+            { call: "tasks.update", args: { id: "$item.id" } },
+            { call: "tasks.update", args: { id: "$item.id" } },
+          ],
+          includeOutput: true,
+        },
+      ],
+    },
+    module,
+    ask,
+    stopAt(3, "cancelled"),
+  );
+  assert.deepEqual(report.halt, {
+    step: 2,
+    code: "cancelled",
+    message: "Cancelled",
+    item: 1,
+    outputs: [[{ id: "t1" }, { id: "t1" }]],
+  });
+  // The first item finished both its calls; nothing after it ran.
+  assert.equal(calls.length, 3);
+});
+
+test("a forEach stopped between items without includeOutput", async () => {
+  calls.length = 0;
+  const report = await runPlan(
+    {
+      steps: [
+        list,
+        {
+          forEach: "$1",
+          do: [{ call: "tasks.update", args: { id: "$item.id" } }],
+        },
+      ],
+    },
+    module,
+    ask,
+    stopAt(3, "interrupted"),
+  );
+  assert.equal(report.halt?.item, 1);
+  assert.equal(Object.hasOwn(report.halt ?? {}, "outputs"), false);
+});
+
+test("a stop after the last step does not halt", async () => {
+  calls.length = 0;
+  const report = await runPlan(
+    { steps: [list] },
+    module,
+    ask,
+    stopAt(2, "interrupted"),
+  );
+  assert.deepEqual(report, {});
 });

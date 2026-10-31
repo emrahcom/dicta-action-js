@@ -118,3 +118,34 @@ export function deleted(page: Page) {
     () => (window as unknown as { deleted?: string[] }).deleted ?? [],
   );
 }
+
+// Makes a capability's run wait until finishStep(); counts its calls in
+// window.runs.
+export async function holdStep(page: Page, name: string) {
+  await page.evaluate((capability) => {
+    const win = window as unknown as {
+      finish?: () => void;
+      runs: number;
+    };
+    win.runs = 0;
+    const element = document.querySelector("dicta-action") as unknown as {
+      module: { capabilities: Record<string, { run: () => Promise<unknown> }> };
+    };
+    element.module.capabilities[capability].run = () => {
+      win.runs += 1;
+      return new Promise((resolve) => {
+        win.finish = () => resolve([]);
+      });
+    };
+  }, name);
+}
+
+export function finishStep(page: Page) {
+  return page.evaluate(() =>
+    (window as unknown as { finish: () => void }).finish(),
+  );
+}
+
+export function runs(page: Page) {
+  return page.evaluate(() => (window as unknown as { runs: number }).runs);
+}

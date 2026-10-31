@@ -16,6 +16,10 @@ type Request = {
   exchange: unknown[];
   // The text of the open question.
   question?: string;
+  // While a confirmation is open, text is ignored.
+  confirming?: boolean;
+  // Text the user added that is not in the exchange yet.
+  added: string[];
 };
 
 // The element's own strings (specs/architecture.md, Strings).
@@ -30,6 +34,9 @@ const STRINGS = {
 type StringKey = keyof typeof STRINGS;
 
 const DEFAULT_NOTICE_SECONDS = 5;
+// The longest text taken, in Unicode code points (contract-protocol.md,
+// Limits).
+const MAX_TEXT_CHARS = 10000;
 // How long the status region stays empty before a new text.
 const ANNOUNCE_DELAY_MS = 100;
 
@@ -175,15 +182,30 @@ export class DictaAction extends HTMLElement {
     if (trimmed === "") {
       return;
     }
+    if (Array.from(trimmed).length > MAX_TEXT_CHARS) {
+      this.#showNotice(this.#string("tooLong"));
+      return;
+    }
     const request = this.#request;
     if (request === undefined) {
       this.#hideNotice();
-      this.#request = { text: trimmed, exchange: [] };
+      this.#request = { text: trimmed, exchange: [], added: [] };
       void this.#round(this.#request);
     } else if (request.question !== undefined) {
       this.#answer(request, trimmed);
+    } else if (!request.confirming) {
+      // The request is waiting for the server or running a plan (contract-
+      // protocol.md, Added text and cancel).
+      request.added.push(trimmed);
     }
-    // Otherwise the request is running; added text comes in its own task.
+  }
+
+  // Moves the added texts into the exchange, each as its own item.
+  #takeAdded(request: Request) {
+    for (const added of request.added) {
+      request.exchange.push({ added });
+    }
+    request.added = [];
   }
 
   // Sends the next round of the request and acts on its reply.
@@ -207,26 +229,49 @@ export class DictaAction extends HTMLElement {
       return;
     }
     request.requestId = requestId;
+    if (request.added.length > 0) {
+      if (reply.type === "plan" || reply.type === "question") {
+        // Text came while waiting: the reply is dropped, and the next round
+        // has the exchange as it was, followed by the added text.
+        this.#takeAdded(request);
+        void this.#round(request);
+        return;
+      }
+      // After done, a stop or an info the request is over, and the held text
+      // is given again: the first starts a new request.
+      const held = request.added;
+      request.added = [];
+      this.#end(request, reply);
+      for (const text of held) {
+        this.submit(text);
+      }
+      return;
+    }
     switch (reply.type) {
       case "question":
         request.question = reply.text;
         this.#showQuestion(request, reply.text, reply.options ?? []);
         break;
-      case "done":
-        this.#request = undefined;
-        this.#hideView();
-        if (reply.text) {
-          this.#showNotice(reply.text);
-        }
-        break;
-      case "stop":
-      case "info":
-        this.#request = undefined;
-        this.#showEnd(reply.type, reply.text);
-        break;
       case "plan":
         void this.#runPlan(request, reply.plan);
         break;
+      default:
+        this.#end(request, reply);
+    }
+  }
+
+  // Ends the request with a done, a stop or an info.
+  #end(request: Request, reply: Reply) {
+    if (this.#request === request) {
+      this.#request = undefined;
+    }
+    if (reply.type === "done") {
+      this.#hideView();
+      if (reply.text) {
+        this.#showNotice(reply.text);
+      }
+    } else if (reply.type === "stop" || reply.type === "info") {
+      this.#showEnd(reply.type, reply.text);
     }
   }
 
@@ -243,8 +288,16 @@ export class DictaAction extends HTMLElement {
         if (text) {
           this.#announce(text);
         }
-        report = await runPlan(plan as Plan, client.module, (confirmation) =>
-          this.#ask(request, confirmation, text),
+        report = await runPlan(
+          plan as Plan,
+          client.module,
+          (confirmation) => this.#ask(request, confirmation, text),
+          () => {
+            if (this.#request !== request) {
+              return "cancelled";
+            }
+            return request.added.length > 0 ? "interrupted" : undefined;
+          },
         );
       }
     } catch (err) {
@@ -257,6 +310,8 @@ export class DictaAction extends HTMLElement {
       return;
     }
     request.exchange.push({ plan, report });
+    // Text that came after the last step follows the report without a halt.
+    this.#takeAdded(request);
     void this.#round(request);
   }
 
@@ -332,6 +387,7 @@ export class DictaAction extends HTMLElement {
         resolve(false);
         return;
       }
+      request.confirming = true;
       const texts = confirmation.items.map((item) => item.join("\n"));
       if (confirmation.count !== undefined) {
         texts.push(
@@ -351,10 +407,12 @@ export class DictaAction extends HTMLElement {
       this.#setView("confirmation", [
         ...elements,
         this.#button("continue", () => {
+          request.confirming = false;
           this.#showWorking(label);
           resolve(true);
         }),
         this.#button("cancel", () => {
+          request.confirming = false;
           this.#cancel();
           resolve(false);
         }),

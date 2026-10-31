@@ -56,7 +56,7 @@ test("while waiting, the working view shows the indicator and Cancel", async ({
   ).toBe(true);
 });
 
-test("a submit while a request runs is ignored for now", async ({ page }) => {
+test("text while waiting is held until the response", async ({ page }) => {
   const routes = await holdRounds(page);
   await openPage(page);
   await submit(page, "a");

@@ -166,6 +166,18 @@ export type Ask = (confirmation: Confirmation) => Promise<boolean>;
 
 class Cancelled extends Error {}
 
+// A forEach stopped between items; its halt is already set.
+class Stopped extends Error {}
+
+// Why a plan stops early at the next step or item: added text or cancel
+// (contract-protocol.md, Added text and cancel).
+export type Stop = "interrupted" | "cancelled";
+
+const STOP_MESSAGES: Record<Stop, string> = {
+  interrupted: "The user added text",
+  cancelled: "Cancelled",
+};
+
 const SHOWN_ITEMS = 3;
 const DEFAULT_CONFIRM_OVER = 10;
 
@@ -180,11 +192,14 @@ function asks(capability: Capability, items?: number, confirmOver = 0) {
 }
 
 // Runs a plan that passed checkPlan and returns its report. When the user
-// cancels at a confirmation, the halt has the code `cancelled`.
+// cancels at a confirmation, the halt has the code `cancelled`. `stop` is
+// asked between steps, and in a forEach between items; a step or an item that
+// started always finishes.
 export async function runPlan(
   plan: Plan,
   module: CapabilityModule,
   ask: Ask,
+  stop: () => Stop | undefined = () => undefined,
 ): Promise<Report> {
   const outputs: unknown[] = [];
   const included: [number, unknown][] = [];
@@ -193,6 +208,11 @@ export async function runPlan(
 
   for (const [i, step] of plan.steps.entries()) {
     const number = i + 1;
+    const stopped = stop();
+    if (stopped) {
+      halt = { step: number, code: stopped, message: STOP_MESSAGES[stopped] };
+      break;
+    }
     try {
       if (isCall(step)) {
         const call = prepare(step, module, { outputs });
@@ -242,6 +262,20 @@ export async function runPlan(
         }
         const output: unknown[][] = [];
         for (const [k, item] of items.entries()) {
+          const itemStopped = k > 0 ? stop() : undefined;
+          if (itemStopped) {
+            // The items that ran are all complete, so `do` is not set.
+            halt = {
+              step: number,
+              code: itemStopped,
+              message: STOP_MESSAGES[itemStopped],
+              item: k,
+            };
+            if (step.includeOutput) {
+              halt.outputs = output;
+            }
+            throw new Stopped();
+          }
           const calls: unknown[] = [];
           output.push(calls);
           for (const [j, call] of step.do.entries()) {
@@ -270,6 +304,9 @@ export async function runPlan(
         outputs.push(output);
       }
     } catch (err) {
+      if (err instanceof Stopped) {
+        break;
+      }
       if (err instanceof Cancelled) {
         halt = { step: number, code: "cancelled", message: "Cancelled" };
         break;
