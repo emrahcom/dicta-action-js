@@ -2,7 +2,13 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { CapabilityModule } from "../src/index.ts";
 import type { Plan } from "../src/plan.ts";
-import { type Confirmation, runPlan, type Stop } from "../src/run.ts";
+import {
+  type Confirmation,
+  newProgress,
+  reportSoFar,
+  runPlan,
+  type Stop,
+} from "../src/run.ts";
 
 type Args = Record<string, unknown>;
 
@@ -605,4 +611,90 @@ test("a stop after the last step does not halt", async () => {
     stopAt(2, "interrupted"),
   );
   assert.deepEqual(report, {});
+});
+
+// Page changes: the report so far (contract-protocol.md, Page changes).
+
+test("the report so far halts at the running step with its outputs", async () => {
+  const progress = newProgress();
+  let soFar: unknown;
+  let running: boolean | undefined;
+  const leaving = moduleWith({
+    ...module.capabilities,
+    "page.open": {
+      level: "write",
+      desc: "Opens a page.",
+      run: async () => {
+        running = progress.running;
+        soFar = reportSoFar(progress, "navigated", "The page changed");
+        return null;
+      },
+    },
+  });
+  await runPlan(
+    {
+      steps: [
+        { ...list, includeOutput: true },
+        { call: "page.open", args: {} },
+      ],
+    },
+    leaving,
+    ask,
+    undefined,
+    progress,
+  );
+  assert.equal(running, true);
+  assert.equal(progress.running, false);
+  assert.deepEqual(soFar, {
+    outputs: { 1: TASKS },
+    halt: { step: 2, code: "navigated", message: "The page changed" },
+  });
+});
+
+test("the report so far in a forEach has its item, call and outputs", async () => {
+  const progress = newProgress();
+  let soFar: unknown;
+  const leaving = moduleWith({
+    ...module.capabilities,
+    "page.open": {
+      level: "write",
+      desc: "Opens a page.",
+      args: { type: "object", properties: { id: { type: "string" } } },
+      run: async (args) => {
+        if (args.id === "t2") {
+          soFar = reportSoFar(progress, "navigated", "The page changed");
+        }
+        return { id: args.id };
+      },
+    },
+  });
+  await runPlan(
+    {
+      steps: [
+        list,
+        {
+          forEach: "$1",
+          do: [
+            { call: "tasks.update", args: { id: "$item.id" } },
+            { call: "page.open", args: { id: "$item.id" } },
+          ],
+          includeOutput: true,
+        },
+      ],
+    },
+    leaving,
+    ask,
+    undefined,
+    progress,
+  );
+  assert.deepEqual(soFar, {
+    halt: {
+      step: 2,
+      code: "navigated",
+      message: "The page changed",
+      item: 1,
+      do: 1,
+      outputs: [[{ id: "t1" }, { id: "t1" }], [{ id: "t2" }]],
+    },
+  });
 });

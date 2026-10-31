@@ -6,7 +6,16 @@ import type { CapabilityModule } from "./module.ts";
 import { checkPlan, type Plan } from "./plan.ts";
 import { addHistory, type Outcome } from "./history.ts";
 import { localTime, type Reply, RoundClient } from "./round.ts";
-import { type Confirmation, cut, type Report, runPlan } from "./run.ts";
+import {
+  type Confirmation,
+  cut,
+  newProgress,
+  type Progress,
+  type Report,
+  reportSoFar,
+  runPlan,
+} from "./run.ts";
+import { saveRequest, takeSaved } from "./saved.ts";
 
 type View = "working" | "question" | "confirmation" | "stop" | "error" | "info";
 
@@ -23,7 +32,18 @@ type Request = {
   added: string[];
   // While a plan runs; a cancel then waits for its last report.
   running?: boolean;
+  // The running plan and where it is, for a page change.
+  plan?: unknown;
+  progress?: Progress;
+  // Set when the page was left; the request is saved or stored already.
+  left?: boolean;
 };
+
+// A saved request older than this ends instead of going on.
+const SAVED_MS = 60_000;
+// A round that fails while the page is being left waits this long for
+// pagehide; the navigation may be called off.
+const LEAVING_MS = 1000;
 
 // The element's own strings (specs/architecture.md, Strings).
 const STRINGS = {
@@ -116,7 +136,6 @@ export class DictaAction extends HTMLElement {
   // Set by the application; see specs/architecture.md (Element).
   // Declared only: a class field would wipe a value set before the element was
   // defined.
-  declare module: CapabilityModule | undefined;
   declare getToken: (() => Promise<string>) | undefined;
   declare strings: Record<string, unknown> | undefined;
 
@@ -142,8 +161,29 @@ export class DictaAction extends HTMLElement {
   #noticeFocused = false;
   #announceTimer: ReturnType<typeof setTimeout> | undefined;
 
+  static observedAttributes = ["server"];
+
+  #module: CapabilityModule | undefined;
+
+  // Setting the module may let a saved request go on (#resume).
+  get module() {
+    return this.#module;
+  }
+
+  set module(module: CapabilityModule | undefined) {
+    this.#module = module;
+    this.#resume();
+  }
+
   constructor() {
     super();
+    // A module set before the element was defined is an own property that
+    // hides the accessor; it moves into the accessor.
+    if (Object.hasOwn(this, "module")) {
+      const module = Reflect.get(this, "module") as CapabilityModule;
+      Reflect.deleteProperty(this, "module");
+      this.#module = module;
+    }
     this.#internals = this.attachInternals();
     const root = this.attachShadow({ mode: "open" });
     const style = document.createElement("style");
@@ -178,6 +218,94 @@ export class DictaAction extends HTMLElement {
     this.#announcer.className = "announcer";
     this.#announcer.setAttribute("role", "status");
     root.append(style, this.#view, this.#notice, this.#announcer);
+  }
+
+  connectedCallback() {
+    window.addEventListener("beforeunload", this.#onBeforeUnload);
+    window.addEventListener("pagehide", this.#onPageHide);
+    this.#resume();
+  }
+
+  disconnectedCallback() {
+    window.removeEventListener("beforeunload", this.#onBeforeUnload);
+    window.removeEventListener("pagehide", this.#onPageHide);
+  }
+
+  // Browsers abort a pending round when a page load starts, after
+  // beforeunload and before pagehide; that is a page change, not an error.
+  #leaving = false;
+
+  #onBeforeUnload = () => {
+    this.#leaving = true;
+  };
+
+  attributeChangedCallback() {
+    this.#resume();
+  }
+
+  // The page is left in the middle of a request: it goes on in the new page
+  // only if a step runs; otherwise it ends as cancelled, with everything done
+  // so far (contract-protocol.md, Page changes).
+  #onPageHide = () => {
+    const request = this.#request;
+    if (request === undefined) {
+      return;
+    }
+    this.#request = undefined;
+    request.left = true;
+    const { progress, plan } = request;
+    if (progress?.running && request.requestId !== undefined) {
+      saveRequest({
+        savedAt: Date.now(),
+        requestId: request.requestId,
+        text: request.text,
+        exchange: request.exchange,
+        plan,
+        report: reportSoFar(progress, "navigated", "The page changed"),
+        step: progress.step,
+        ...(progress.item === undefined
+          ? {}
+          : { item: progress.item, do: progress.do }),
+      });
+      return;
+    }
+    if (progress !== undefined) {
+      // A report not sent yet goes into the history too.
+      request.exchange.push({
+        plan,
+        report: reportSoFar(progress, "cancelled", "Cancelled"),
+      });
+    }
+    this.#store(request, { type: "cancelled" });
+  };
+
+  // Takes a saved request out once the element has its server and module. A
+  // recent one goes on with its report in the next round, which sends the new
+  // page's state; an older one ends as cancelled.
+  #resume() {
+    if (
+      this.#request !== undefined ||
+      !this.getAttribute("server") ||
+      this.#module === undefined
+    ) {
+      return;
+    }
+    const saved = takeSaved();
+    if (saved === undefined) {
+      return;
+    }
+    const request: Request = {
+      text: saved.text,
+      requestId: saved.requestId,
+      exchange: [...saved.exchange, { plan: saved.plan, report: saved.report }],
+      added: [],
+    };
+    if (Date.now() - saved.savedAt > SAVED_MS) {
+      this.#store(request, { type: "cancelled" });
+      return;
+    }
+    this.#request = request;
+    void this.#round(request);
   }
 
   submit(text: string) {
@@ -223,7 +351,15 @@ export class DictaAction extends HTMLElement {
         exchange: request.exchange,
       }));
     } catch (err) {
-      if (this.#request === request) {
+      if (this.#leaving) {
+        // pagehide ends the request; when the page stays, it is an error.
+        setTimeout(() => {
+          this.#leaving = false;
+          if (this.#request === request) {
+            this.#fail(request, err);
+          }
+        }, LEAVING_MS);
+      } else if (this.#request === request) {
         this.#fail(request, err);
       }
       return;
@@ -295,6 +431,8 @@ export class DictaAction extends HTMLElement {
           this.#announce(text);
         }
         request.running = true;
+        request.plan = plan;
+        request.progress = newProgress();
         report = await runPlan(
           plan as Plan,
           client.module,
@@ -305,20 +443,25 @@ export class DictaAction extends HTMLElement {
             }
             return request.added.length > 0 ? "interrupted" : undefined;
           },
+          request.progress,
         );
       }
     } catch (err) {
       request.running = false;
+      request.progress = undefined;
       if (this.#request === request) {
         this.#fail(request, err);
       }
       return;
     }
     request.running = false;
+    request.progress = undefined;
     request.exchange.push({ plan, report });
     if (this.#request !== request) {
       // Cancelled while the plan ran: stored with this last report.
-      this.#store(request, { type: "cancelled" });
+      if (!request.left) {
+        this.#store(request, { type: "cancelled" });
+      }
       return;
     }
     // Text that came after the last step follows the report without a halt.

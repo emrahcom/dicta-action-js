@@ -17,12 +17,51 @@ const PAGE = `<!doctype html>
 <script type="module" src="/dist/index.js"></script>
 <body></body>`;
 
+// A page that sets up the element and its module itself, as a site does, so
+// it survives page loads. page.reload loads the page again.
+const APP_PAGE = `<!doctype html>
+<meta charset="utf-8">
+<dicta-action></dicta-action>
+<script type="module">
+  import { dictaCapabilities } from "/dist/index.js";
+  const element = document.querySelector("dicta-action");
+  element.setAttribute("server", location.origin);
+  element.module = {
+    site: { name: "Teamboard", desc: "A task list." },
+    state: { desc: "The open page.", run: async () => ({ page: "app" }) },
+    capabilities: {
+      ...dictaCapabilities,
+      "tasks.list": {
+        level: "read",
+        desc: "Lists the tasks.",
+        run: async () => [{ id: "t1" }, { id: "t2" }],
+      },
+      "tasks.delete": {
+        level: "destructive",
+        desc: "Deletes a task.",
+        args: { type: "object", properties: { id: { type: "string" } } },
+        confirm: async ({ id }) => "Delete task " + id,
+        run: async ({ id }) => ({ id }),
+      },
+      "page.reload": {
+        level: "write",
+        desc: "Loads the page again; steps after it do not run.",
+        args: { type: "object", properties: { id: { type: "string" } } },
+        run: () => {
+          location.reload();
+          return new Promise(() => {});
+        },
+      },
+    },
+  };
+</script>`;
+
 async function handle(request: IncomingMessage, response: ServerResponse) {
   const { pathname } = new URL(request.url ?? "/", "http://localhost");
   try {
-    if (pathname === "/") {
+    if (pathname === "/" || pathname === "/app") {
       response.writeHead(200, { "content-type": "text/html" });
-      response.end(PAGE);
+      response.end(pathname === "/" ? PAGE : APP_PAGE);
     } else if (pathname.startsWith("/dist/") && !pathname.includes("..")) {
       const file = await readFile(new URL(pathname.slice(6), DIST));
       response.writeHead(200, { "content-type": "text/javascript" });

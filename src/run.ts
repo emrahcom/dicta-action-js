@@ -191,6 +191,42 @@ function asks(capability: Capability, items?: number, confirmOver = 0) {
   );
 }
 
+// Where a running plan is, for a page change in the middle of it
+// (contract-protocol.md, Page changes): the step, and in a forEach the item
+// and call; whether a call runs now; and the outputs so far.
+export type Progress = {
+  step: number;
+  item?: number;
+  do?: number;
+  running: boolean;
+  included: [number, unknown][];
+  // The forEach's output so far, when its step has includeOutput.
+  output?: unknown[][];
+};
+
+export function newProgress(): Progress {
+  return { step: 1, running: false, included: [] };
+}
+
+// The report of a plan stopped where it is now, with the halt `code`, for a
+// page change: the running step may or may not have finished.
+export function reportSoFar(
+  progress: Progress,
+  code: string,
+  message: string,
+): Report {
+  const halt: Halt = { step: progress.step, code, message };
+  if (progress.item !== undefined) {
+    halt.item = progress.item;
+    halt.do = progress.do;
+    if (progress.output !== undefined) {
+      halt.outputs = progress.output;
+    }
+  }
+  // A copy, since the plan's arrays may still change.
+  return JSON.parse(JSON.stringify(report(progress.included, halt))) as Report;
+}
+
 // Runs a plan that passed checkPlan and returns its report. When the user
 // cancels at a confirmation, the halt has the code `cancelled`. `stop` is
 // asked between steps, and in a forEach between items; a step or an item that
@@ -200,14 +236,19 @@ export async function runPlan(
   module: CapabilityModule,
   ask: Ask,
   stop: () => Stop | undefined = () => undefined,
+  progress: Progress = newProgress(),
 ): Promise<Report> {
   const outputs: unknown[] = [];
-  const included: [number, unknown][] = [];
+  const included = progress.included;
   const confirmOver = module.confirmOver ?? DEFAULT_CONFIRM_OVER;
   let halt: Halt | undefined;
 
   for (const [i, step] of plan.steps.entries()) {
     const number = i + 1;
+    progress.step = number;
+    progress.item = undefined;
+    progress.do = undefined;
+    progress.output = undefined;
     const stopped = stop();
     if (stopped) {
       halt = { step: number, code: stopped, message: STOP_MESSAGES[stopped] };
@@ -222,7 +263,7 @@ export async function runPlan(
         ) {
           throw new Cancelled();
         }
-        outputs.push(await execute(call));
+        outputs.push(await running(progress, () => execute(call)));
       } else {
         const items = resolve(step.forEach, { outputs });
         if (!Array.isArray(items)) {
@@ -261,6 +302,9 @@ export async function runPlan(
           }
         }
         const output: unknown[][] = [];
+        if (step.includeOutput) {
+          progress.output = output;
+        }
         for (const [k, item] of items.entries()) {
           const itemStopped = k > 0 ? stop() : undefined;
           if (itemStopped) {
@@ -279,10 +323,15 @@ export async function runPlan(
           const calls: unknown[] = [];
           output.push(calls);
           for (const [j, call] of step.do.entries()) {
+            progress.item = k;
+            progress.do = j;
             try {
               calls.push(
-                await execute(
-                  prepared?.[k][j] ?? prepare(call, module, { outputs, item }),
+                await running(progress, () =>
+                  execute(
+                    prepared?.[k][j] ??
+                      prepare(call, module, { outputs, item }),
+                  ),
                 ),
               );
             } catch (err) {
@@ -322,6 +371,16 @@ export async function runPlan(
     }
   }
   return report(included, halt);
+}
+
+// Marks a call as running while it runs.
+async function running<T>(progress: Progress, call: () => Promise<T>) {
+  progress.running = true;
+  try {
+    return await call();
+  } finally {
+    progress.running = false;
+  }
 }
 
 // Builds the report: included outputs in step order, halt.outputs last, at
