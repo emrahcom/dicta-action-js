@@ -57,7 +57,6 @@ const saved = {
   report: {
     halt: { step: 1, code: "navigated", message: "The page changed" },
   },
-  step: 1,
 };
 
 test("pageshow from the cache goes on with a saved request", async ({

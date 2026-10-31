@@ -296,10 +296,6 @@ export class DictaAction extends HTMLElement {
         exchange: request.exchange,
         plan,
         report: reportSoFar(progress, "navigated", "The page changed"),
-        step: progress.step,
-        ...(progress.item === undefined
-          ? {}
-          : { item: progress.item, do: progress.do }),
       });
       return;
     }

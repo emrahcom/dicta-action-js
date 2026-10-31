@@ -14,9 +14,6 @@ type Saved = {
   plan: unknown;
   // The report so far, with the halt code `navigated` at the running step.
   report: Report;
-  step: number;
-  item?: number;
-  do?: number;
 };
 
 export function saveRequest(saved: Saved) {

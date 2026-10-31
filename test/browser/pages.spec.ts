@@ -92,7 +92,6 @@ test("a saved request older than 60 seconds ends as cancelled", async ({
       exchange: [],
       plan,
       report: { halt: { step: 1, ...navigated } },
-      step: 1,
     },
   );
   await openApp(page);
