@@ -1,6 +1,6 @@
 // Opens the test server's page (server.ts), which loads the built module, puts
 // the given markup into its body and gives each <dicta-action> a small module
-// with tasks.list and tasks.get
+// with tasks.list, tasks.get and tasks.delete
 // and, unless set, this page's origin as its server.
 // The server's responses are faked with reply().
 
@@ -25,6 +25,21 @@ export async function openPage(
           site: { name: "Teamboard", desc: "A task list." },
           state: { desc: "The open page.", run: async () => ({ page: "a" }) },
           capabilities: {
+            "tasks.delete": {
+              level: "destructive",
+              desc: "Deletes a task.",
+              args: {
+                type: "object",
+                properties: { id: { type: "string" } },
+                required: ["id"],
+              },
+              confirm: async ({ id }: { id: string }) => `Delete task ${id}`,
+              run: async ({ id }: { id: string }) => {
+                (window as unknown as { deleted: string[] }).deleted ??= [];
+                (window as unknown as { deleted: string[] }).deleted.push(id);
+                return { id };
+              },
+            },
             "tasks.list": {
               level: "read",
               desc: "Lists the tasks.",
@@ -95,4 +110,11 @@ export async function replies(page: Page, ...list: unknown[]) {
     return route.fulfill({ json: { requestId: "r1", reply } });
   });
   return bodies;
+}
+
+// The ids tasks.delete was called with.
+export function deleted(page: Page) {
+  return page.evaluate(
+    () => (window as unknown as { deleted?: string[] }).deleted ?? [],
+  );
 }

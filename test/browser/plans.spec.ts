@@ -51,7 +51,7 @@ test("a halted plan is reported too", async ({ page }) => {
 });
 
 test("an invalid plan is reported without running a step", async ({ page }) => {
-  const plan = { steps: [{ call: "tasks.delete", args: {} }] };
+  const plan = { steps: [{ call: "tasks.fly", args: {} }] };
   const bodies = await replies(page, { type: "plan", plan }, done);
   await openPage(page);
   await submit(page, "a");
@@ -62,7 +62,7 @@ test("an invalid plan is reported without running a step", async ({ page }) => {
       report: {
         halt: {
           code: "invalid",
-          message: "steps[0].call names no capability: tasks.delete",
+          message: "steps[0].call names no capability: tasks.fly",
         },
       },
     },

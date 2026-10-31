@@ -2,7 +2,7 @@
 // builds the report (contract-plan.md, Steps, Include output, References,
 // Failures, Limits; contract-protocol.md, Report).
 
-import type { CapabilityModule } from "./module.ts";
+import type { Capability, CapabilityModule } from "./module.ts";
 import {
   type CallStep,
   checkArgs,
@@ -101,49 +101,108 @@ function fill(value: unknown, scope: Scope): unknown {
   return value;
 }
 
-async function runCall(
-  step: CallStep,
-  module: CapabilityModule,
-  scope: Scope,
-): Promise<unknown> {
+// A call with its capability and its filled-in, checked arguments.
+type Prepared = { capability: Capability; args: Record<string, unknown> };
+
+function capabilityOf(step: CallStep, module: CapabilityModule) {
   if (!Object.hasOwn(module.capabilities, step.call)) {
     throw new Failure("capability", `no capability ${step.call}`);
   }
-  const capability = module.capabilities[step.call];
+  return module.capabilities[step.call];
+}
+
+function prepare(
+  step: CallStep,
+  module: CapabilityModule,
+  scope: Scope,
+): Prepared {
+  const capability = capabilityOf(step, module);
   const args = fill(step.args, scope) as Record<string, unknown>;
   try {
     checkArgs(args, capability.args);
   } catch (err) {
     throw new Failure("reference", (err as Error).message);
   }
+  return { capability, args };
+}
+
+// A capability's own string code is reported, otherwise `capability`
+// (contract-capability.md, Errors).
+function capabilityFailure(err: unknown) {
+  const code =
+    isContainer(err) && typeof err.code === "string" ? err.code : "capability";
+  const message = err instanceof Error ? err.message : String(err);
+  return new Failure(code, message);
+}
+
+async function execute({ capability, args }: Prepared) {
   try {
     return await capability.run(args);
   } catch (err) {
-    // A capability's own string code is reported, otherwise `capability`
-    // (contract-capability.md, Errors).
-    const code =
-      isContainer(err) && typeof err.code === "string"
-        ? err.code
-        : "capability";
-    const message = err instanceof Error ? err.message : String(err);
-    throw new Failure(code, message);
+    throw capabilityFailure(err);
   }
 }
 
-// Runs a plan that passed checkPlan and returns its report.
+// The confirmation text from the capability's confirm. A confirm that throws,
+// or a missing one, fails the step as if run had thrown.
+async function confirmText({ capability, args }: Prepared) {
+  if (!capability.confirm) {
+    throw new Failure("capability", "the capability has no confirm");
+  }
+  try {
+    return await capability.confirm(args);
+  } catch (err) {
+    throw capabilityFailure(err);
+  }
+}
+
+// What the user is asked: for each item shown, the texts of its calls that
+// ask, and the number of items when not all are shown (contract-plan.md,
+// Confirmation).
+export type Confirmation = { items: string[][]; count?: number };
+
+// Asks the user; true is Continue, false is Cancel.
+export type Ask = (confirmation: Confirmation) => Promise<boolean>;
+
+class Cancelled extends Error {}
+
+const SHOWN_ITEMS = 3;
+const DEFAULT_CONFIRM_OVER = 10;
+
+// Whether a call asks: a destructive or external one always, a write one in a
+// forEach of more items than confirmOver.
+function asks(capability: Capability, items?: number, confirmOver = 0) {
+  return (
+    capability.level === "destructive" ||
+    capability.level === "external" ||
+    (capability.level === "write" && items !== undefined && items > confirmOver)
+  );
+}
+
+// Runs a plan that passed checkPlan and returns its report. When the user
+// cancels at a confirmation, the halt has the code `cancelled`.
 export async function runPlan(
   plan: Plan,
   module: CapabilityModule,
+  ask: Ask,
 ): Promise<Report> {
   const outputs: unknown[] = [];
   const included: [number, unknown][] = [];
+  const confirmOver = module.confirmOver ?? DEFAULT_CONFIRM_OVER;
   let halt: Halt | undefined;
 
   for (const [i, step] of plan.steps.entries()) {
     const number = i + 1;
     try {
       if (isCall(step)) {
-        outputs.push(await runCall(step, module, { outputs }));
+        const call = prepare(step, module, { outputs });
+        if (
+          asks(call.capability) &&
+          !(await ask({ items: [[await confirmText(call)]] }))
+        ) {
+          throw new Cancelled();
+        }
+        outputs.push(await execute(call));
       } else {
         const items = resolve(step.forEach, { outputs });
         if (!Array.isArray(items)) {
@@ -155,13 +214,43 @@ export async function runPlan(
             `${items.length} items, at most ${MAX_ITEMS}`,
           );
         }
+        const asking = step.do.map((call) =>
+          asks(capabilityOf(call, module), items.length, confirmOver),
+        );
+        // When the step asks, the arguments of every item are filled in and
+        // checked first, so a bad item halts it before the user is asked.
+        let prepared: Prepared[][] | undefined;
+        if (items.length > 0 && asking.includes(true)) {
+          prepared = items.map((item) =>
+            step.do.map((call) => prepare(call, module, { outputs, item })),
+          );
+          const shown: string[][] = [];
+          for (const calls of prepared.slice(0, SHOWN_ITEMS)) {
+            const texts: string[] = [];
+            for (const [j, call] of calls.entries()) {
+              if (asking[j]) {
+                texts.push(await confirmText(call));
+              }
+            }
+            shown.push(texts);
+          }
+          const count =
+            items.length > SHOWN_ITEMS ? { count: items.length } : {};
+          if (!(await ask({ items: shown, ...count }))) {
+            throw new Cancelled();
+          }
+        }
         const output: unknown[][] = [];
         for (const [k, item] of items.entries()) {
           const calls: unknown[] = [];
           output.push(calls);
           for (const [j, call] of step.do.entries()) {
             try {
-              calls.push(await runCall(call, module, { outputs, item }));
+              calls.push(
+                await execute(
+                  prepared?.[k][j] ?? prepare(call, module, { outputs, item }),
+                ),
+              );
             } catch (err) {
               const failure = err as Failure;
               halt = {
@@ -181,6 +270,10 @@ export async function runPlan(
         outputs.push(output);
       }
     } catch (err) {
+      if (err instanceof Cancelled) {
+        halt = { step: number, code: "cancelled", message: "Cancelled" };
+        break;
+      }
       if (!(err instanceof Failure)) {
         throw err;
       }

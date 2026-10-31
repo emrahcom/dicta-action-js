@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { CapabilityModule } from "../src/index.ts";
 import type { Plan } from "../src/plan.ts";
-import { runPlan } from "../src/run.ts";
+import { type Confirmation, runPlan } from "../src/run.ts";
 
 type Args = Record<string, unknown>;
 
@@ -80,9 +80,19 @@ const module = moduleWith({
   },
 });
 
-async function run(plan: Plan) {
+// Every confirmation asked, answered with `answer`.
+const asked: Confirmation[] = [];
+let answer = true;
+
+async function ask(confirmation: Confirmation) {
+  asked.push(confirmation);
+  return answer;
+}
+
+async function run(plan: Plan, using = module) {
   calls.length = 0;
-  return runPlan(plan, module);
+  asked.length = 0;
+  return runPlan(plan, using, ask);
 }
 
 const list = { call: "tasks.list", args: {} };
@@ -188,8 +198,7 @@ test("a forEach over more than 100 items halts before any item", async () => {
       run: async () => Array(101).fill({ id: "t" }),
     },
   });
-  calls.length = 0;
-  const report = await runPlan(
+  const report = await run(
     {
       steps: [
         list,
@@ -293,3 +302,217 @@ test("halt outputs that do not fit go into halt.tooLarge", async () => {
 function bytes(value: unknown) {
   return new TextEncoder().encode(JSON.stringify(value)).length;
 }
+
+// Confirmations (contract-plan.md, Confirmation).
+
+function confirmModule(items: number) {
+  return moduleWith({
+    "tasks.list": {
+      level: "read",
+      desc: "Lists.",
+      run: async () =>
+        Array.from({ length: items }, (_, i) => ({ id: `t${i + 1}` })),
+    },
+    "tasks.delete": {
+      level: "destructive",
+      desc: "Deletes a task.",
+      args: {
+        type: "object",
+        properties: { id: { type: "string" } },
+        required: ["id"],
+      },
+      confirm: async (args) => `Delete ${String(args.id)}`,
+      run: recorder("tasks.delete", (args) => ({ id: args.id })),
+    },
+    "tasks.update": {
+      level: "write",
+      desc: "Updates a task.",
+      args: { type: "object", properties: { id: { type: "string" } } },
+      confirm: async (args) => `Update ${String(args.id)}`,
+      run: recorder("tasks.update", (args) => ({ id: args.id })),
+    },
+    "tasks.share": {
+      level: "external",
+      desc: "Shares a task.",
+      args: { type: "object", properties: { id: { type: "string" } } },
+      confirm: async () => {
+        throw Object.assign(new Error("Unknown user"), { code: "not_found" });
+      },
+      run: recorder("tasks.share", () => null),
+    },
+    "tasks.send": {
+      level: "external",
+      desc: "Sends a task, without confirm.",
+      run: recorder("tasks.send", () => null),
+    },
+  });
+}
+
+function withConfirmOver(using: CapabilityModule, confirmOver: number) {
+  return { ...using, confirmOver };
+}
+
+test("a destructive call asks with its confirm text", async () => {
+  answer = true;
+  const report = await run(
+    { steps: [{ call: "tasks.delete", args: { id: "t1" } }] },
+    confirmModule(0),
+  );
+  assert.deepEqual(asked, [{ items: [["Delete t1"]] }]);
+  assert.deepEqual(report, {});
+  assert.deepEqual(calls, [["tasks.delete", { id: "t1" }]]);
+});
+
+test("a read or write call does not ask", async () => {
+  await run(
+    {
+      steps: [
+        { call: "tasks.list", args: {} },
+        { call: "tasks.update", args: { id: "t1" } },
+      ],
+    },
+    confirmModule(1),
+  );
+  assert.deepEqual(asked, []);
+});
+
+test("Cancel halts with cancelled and runs nothing more", async () => {
+  answer = false;
+  const report = await run(
+    {
+      steps: [
+        { call: "tasks.update", args: { id: "t1" } },
+        { call: "tasks.delete", args: { id: "t1" } },
+        { call: "tasks.update", args: { id: "t2" } },
+      ],
+    },
+    confirmModule(0),
+  );
+  answer = true;
+  assert.deepEqual(report.halt, {
+    step: 2,
+    code: "cancelled",
+    message: "Cancelled",
+  });
+  assert.deepEqual(calls, [["tasks.update", { id: "t1" }]]);
+});
+
+test("a confirm that throws fails the step before it runs", async () => {
+  const report = await run(
+    { steps: [{ call: "tasks.share", args: { id: "t1" } }] },
+    confirmModule(0),
+  );
+  assert.deepEqual(report.halt, {
+    step: 1,
+    code: "not_found",
+    message: "Unknown user",
+  });
+  assert.deepEqual(asked, []);
+  assert.deepEqual(calls, []);
+});
+
+test("a missing confirm fails the step as a capability error", async () => {
+  const report = await run(
+    { steps: [{ call: "tasks.send", args: {} }] },
+    confirmModule(0),
+  );
+  assert.equal(report.halt?.code, "capability");
+  assert.deepEqual(calls, []);
+});
+
+const deleteEach = {
+  forEach: "$1",
+  do: [{ call: "tasks.delete", args: { id: "$item.id" } }],
+};
+
+test("a destructive forEach asks once with the first three items", async () => {
+  await run(
+    { steps: [{ call: "tasks.list", args: {} }, deleteEach] },
+    confirmModule(5),
+  );
+  assert.deepEqual(asked, [
+    { items: [["Delete t1"], ["Delete t2"], ["Delete t3"]], count: 5 },
+  ]);
+  assert.equal(calls.length, 5);
+});
+
+test("a forEach of three items or fewer has no count", async () => {
+  await run(
+    { steps: [{ call: "tasks.list", args: {} }, deleteEach] },
+    confirmModule(3),
+  );
+  assert.deepEqual(asked, [
+    { items: [["Delete t1"], ["Delete t2"], ["Delete t3"]] },
+  ]);
+});
+
+test("a forEach of no items does not ask", async () => {
+  await run(
+    { steps: [{ call: "tasks.list", args: {} }, deleteEach] },
+    confirmModule(0),
+  );
+  assert.deepEqual(asked, []);
+});
+
+const updateEach = {
+  forEach: "$1",
+  do: [{ call: "tasks.update", args: { id: "$item.id" } }],
+};
+
+test("a write forEach asks only over confirmOver, 10 by default", async () => {
+  const steps = [{ call: "tasks.list", args: {} }, updateEach];
+  await run({ steps }, confirmModule(10));
+  assert.deepEqual(asked, []);
+  await run({ steps }, confirmModule(11));
+  assert.equal(asked.length, 1);
+  await run({ steps }, withConfirmOver(confirmModule(3), 2));
+  assert.deepEqual(asked, [
+    { items: [["Update t1"], ["Update t2"], ["Update t3"]] },
+  ]);
+});
+
+test("an item shows the texts of all its calls that ask", async () => {
+  await run(
+    {
+      steps: [
+        { call: "tasks.list", args: {} },
+        {
+          forEach: "$1",
+          do: [
+            { call: "tasks.update", args: { id: "$item.id" } },
+            { call: "tasks.delete", args: { id: "$item.id" } },
+          ],
+        },
+      ],
+    },
+    withConfirmOver(confirmModule(2), 1),
+  );
+  assert.deepEqual(asked, [
+    {
+      items: [
+        ["Update t1", "Delete t1"],
+        ["Update t2", "Delete t2"],
+      ],
+    },
+  ]);
+});
+
+test("a bad item halts the forEach before the user is asked", async () => {
+  const report = await run(
+    {
+      steps: [
+        { call: "tasks.list", args: {} },
+        {
+          forEach: "$1",
+          do: [{ call: "tasks.delete", args: { id: "$item.title" } }],
+        },
+      ],
+    },
+    confirmModule(2),
+  );
+  assert.equal(report.halt?.code, "reference");
+  assert.equal(report.halt?.step, 2);
+  assert.equal(report.halt?.item, undefined);
+  assert.deepEqual(asked, []);
+  assert.deepEqual(calls, []);
+});

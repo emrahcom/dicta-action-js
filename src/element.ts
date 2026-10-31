@@ -5,7 +5,7 @@ import type { SiteContext } from "./context.ts";
 import type { CapabilityModule } from "./module.ts";
 import { checkPlan, type Plan } from "./plan.ts";
 import { type Reply, RoundClient } from "./round.ts";
-import { cut, type Report, runPlan } from "./run.ts";
+import { type Confirmation, cut, type Report, runPlan } from "./run.ts";
 
 type View = "working" | "question" | "confirmation" | "stop" | "error" | "info";
 
@@ -243,7 +243,9 @@ export class DictaAction extends HTMLElement {
         if (text) {
           this.#announce(text);
         }
-        report = await runPlan(plan as Plan, client.module);
+        report = await runPlan(plan as Plan, client.module, (confirmation) =>
+          this.#ask(request, confirmation, text),
+        );
       }
     } catch (err) {
       if (this.#request === request) {
@@ -321,7 +323,47 @@ export class DictaAction extends HTMLElement {
     return typeof value === "string" ? value : STRINGS[key];
   }
 
-  #button(name: "cancel" | "close", onClick: () => void) {
+  // Shows the confirmation view and waits for Continue or Cancel. Continue
+  // brings back the working view with the plan's label; Cancel ends the
+  // request.
+  #ask(request: Request, confirmation: Confirmation, label?: string) {
+    return new Promise<boolean>((resolve) => {
+      if (this.#request !== request) {
+        resolve(false);
+        return;
+      }
+      const texts = confirmation.items.map((item) => item.join("\n"));
+      if (confirmation.count !== undefined) {
+        texts.push(
+          this.#string("items").replaceAll(
+            "{count}",
+            String(confirmation.count),
+          ),
+        );
+      }
+      const elements = texts.map((text) => {
+        const element = document.createElement("div");
+        element.className = "text";
+        element.part.add("text");
+        element.textContent = text;
+        return element;
+      });
+      this.#setView("confirmation", [
+        ...elements,
+        this.#button("continue", () => {
+          this.#showWorking(label);
+          resolve(true);
+        }),
+        this.#button("cancel", () => {
+          this.#cancel();
+          resolve(false);
+        }),
+      ]);
+      this.#announce(texts.join("\n"));
+    });
+  }
+
+  #button(name: "continue" | "cancel" | "close", onClick: () => void) {
     const button = document.createElement("button");
     button.type = "button";
     button.part.add(name);
