@@ -88,10 +88,10 @@ The element runs one request at a time. `submit(text)`:
 - While a question is open: answers it.
 - While a confirmation is open: is ignored; only its buttons answer it
   (`contract-protocol.md`, Added text and cancel).
-- While the element waits for the server or runs a plan: is added text
-  (`contract-protocol.md`, Added text and cancel). The client takes all text
-  that comes; background speech from an always-open microphone is a known open
-  point.
+- While the element waits for the server, runs a plan or waits for a page load:
+  is added text (`contract-protocol.md`, Added text and cancel and Page
+  changes). The client takes all text that comes; background speech from an
+  always-open microphone is a known open point.
 - Text over 10000 characters (Unicode code points) is not taken: the element
   shows the `tooLong` text as a notice (Display) and nothing else changes
   (`contract-protocol.md`, Limits).
@@ -120,10 +120,10 @@ also the element's custom state (Element), for styling.
 While a request runs, from the submit on, each view has its own Cancel button,
 placed to fit the view:
 
-- `working`, while the element waits for the server or runs a plan: a progress
-  indicator, with the label of the running plan when it has one, and Cancel. The
-  indicator is a small spinner drawn with CSS. When the user prefers reduced
-  motion (`prefers-reduced-motion`), it stands still.
+- `working`, while the element waits for the server, runs a plan or waits for a
+  page load: a progress indicator, with the label of the running plan when it
+  has one, and Cancel. The indicator is a small spinner drawn with CSS. When the
+  user prefers reduced motion (`prefers-reduced-motion`), it stands still.
 - `question`: the question's text, its options as buttons and Cancel. A click on
   an option answers with the option's text.
 - `confirmation`: only the texts from the module's `confirm` as plain text
@@ -165,9 +165,15 @@ The runner follows `contract-plan.md` and builds the report of
   such as `__proto__` and `toString`, are never taken as present.
 - References are filled in before each call and the arguments are checked again.
   A string that starts with `$$` is passed on with a single `$`.
-- Added text, cancel and page changes are seen between steps, and in a `forEach`
-  between items; a step or an item that started always finishes
-  (`contract-protocol.md`, Added text and cancel).
+- Added text and cancel are seen between steps, and in a `forEach` between
+  items; a step or an item that started always finishes (`contract-protocol.md`,
+  Added text and cancel).
+- A page load is seen after each step, and in a `forEach` after each call: a
+  `navigate` event of the Navigation API whose destination is another document
+  (`destination.sameDocument` is false) since the step started. The runner then
+  stops and the element waits for the page to be left (`contract-protocol.md`,
+  Page changes). In a browser without the Navigation API, page loads are not
+  seen and the runner goes on.
 - Error messages are cut to 200 characters. Included outputs are counted as the
   UTF-8 bytes of their JSON, at most 16 KB together.
 
@@ -175,10 +181,10 @@ The runner follows `contract-plan.md` and builds the report of
 
 The element keeps two entries in the tab's `sessionStorage`, as JSON:
 
-- `dicta-action-saved`: the request saved on `pagehide` while a step runs:
-  `savedAt` (milliseconds since 1970, for the 60 second check), `requestId`,
-  `text`, `exchange`, the running plan and the report so far, with the halt
-  `navigated` at the running step, and `item` and `do` in a `forEach`
+- `dicta-action-saved`: the request saved on `pagehide` while the element waits
+  for a page load: `savedAt` (milliseconds since 1970, for the 60 second check),
+  `requestId`, `text`, `exchange`, the plan, its report, with the halt
+  `navigated` at the first step that did not run or no halt, and the added text
   (`contract-protocol.md`, Page changes).
 - `dicta-action-history`: the finished requests, newest first, each with
   `requestId`, `time`, `text`, `outcome` and `exchange`. At most 20 requests;
