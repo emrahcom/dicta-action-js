@@ -100,9 +100,10 @@ developers.
 
 The element shows little: the user wants the task done, not to read.
 
-- While a request runs: a progress indicator with the plan's label, when the
-  plan has one, and one Cancel button. Cancel stays visible for the whole
-  request, also during a confirmation.
+- While the element waits for the server, from the submit on, or runs a plan: a
+  progress indicator, with the label of the running plan when it has one.
+- One Cancel button, from the submit until the request ends, also during a
+  question or a confirmation.
 - A question: its text, its options as buttons and Cancel. A click on an option
   answers with the option's text.
 - A confirmation: only the texts from the module's `confirm` as plain text,
