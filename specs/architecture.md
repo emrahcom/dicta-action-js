@@ -127,7 +127,7 @@ placed to fit the view:
   page load: a progress indicator, with the label of the running plan when it
   has one, and Cancel. The indicator is a small spinner drawn with CSS. When the
   user prefers reduced motion (`prefers-reduced-motion`), it stands still.
-- `question`: the question's text, its options as buttons and Cancel. A click on
+- `question`: the question's text, its options as buttons and Cancel. Pressing
   an option answers with the option's text.
 - `confirmation`: only the texts from the module's `confirm` as plain text
   (`contract-plan.md`, Confirmation), Continue and Cancel. For a `forEach`, the

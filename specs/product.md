@@ -42,7 +42,7 @@ the site's capability functions, with the user's own rights.
 - Text the application passes while a request runs is added text: it interrupts
   the plan, and the server decides what comes next (`contract-protocol.md` in
   `dicta-action-server`, Added text and cancel).
-- Before a risky step, the user clicks Continue or Cancel: a destructive or
+- Before a risky step, the user presses Continue or Cancel: a destructive or
   external step, a `forEach` with a write call and more items than the module's
   `confirmOver`, or the first of more than `confirmOver` top-level steps that
   call one write capability (`contract-plan.md` in `dicta-action-server`,
