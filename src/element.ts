@@ -740,7 +740,8 @@ export class DictaAction extends HTMLElement {
       ...buttons,
       this.#button("cancel", () => this.#cancel()),
     ]);
-    this.#announce(text);
+    // With its options, so a screen reader user knows they are there.
+    this.#announce([text, ...options].join("\n"));
   }
 
   // Shows a view in place of the one shown. When the focus was in the old

@@ -26,8 +26,9 @@ test("a question shows its text, its options and Cancel", async ({ page }) => {
   ]);
   await expect(page.getByRole("button", { name: "Cancel" })).toBeVisible();
   expect(await inState(page, "question")).toBe(true);
+  // The options are announced after the question's text.
   await expect(page.locator('[role="status"]')).toHaveText(
-    "Working Which Friday?",
+    "Working Which Friday? This week Next week",
   );
 });
 
