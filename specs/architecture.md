@@ -90,10 +90,11 @@ Before each round the element calls `module.state.run()` for `state` and takes
 `+00:00` too, never `Z` (`contract-protocol.md`, Request body).
 
 A round is `POST <server>/dicta-action/v1/round`. A `401` gets a new token and
-one more try with the same body. Every other HTTP error, a network failure and a
-reply type the element does not know end the request as an error
-(`contract-protocol.md`, Errors). The element logs the server's `error` to the
-console, for the site's developers.
+one more try with the same body. Every other HTTP error, a network failure, a
+round without a response after 60 seconds and a reply type the element does not
+know end the request as an error, with no retry (`contract-protocol.md`,
+Errors). The element logs the server's `error` to the console, for the site's
+developers.
 
 ## Display
 
