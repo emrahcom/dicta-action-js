@@ -1,0 +1,59 @@
+// Opens the test server's page (server.ts), which loads the built module, puts
+// the given markup into its body and gives each <dicta-action> a small module
+// and, unless set, this page's origin as its server.
+// The server's responses are faked with reply().
+
+import type { Page, Route } from "@playwright/test";
+
+export const ROUND = "**/dicta-action/v1/round";
+
+export async function openPage(
+  page: Page,
+  body = "<dicta-action></dicta-action>",
+) {
+  await page.goto("/");
+  await page.waitForFunction(() => customElements.get("dicta-action"));
+  await page.evaluate((markup) => {
+    document.body.innerHTML = markup;
+    for (const element of document.querySelectorAll("dicta-action")) {
+      if (!element.hasAttribute("server")) {
+        element.setAttribute("server", location.origin);
+      }
+      Object.assign(element, {
+        module: {
+          site: { name: "Teamboard", desc: "A task list." },
+          state: { desc: "The open page.", run: async () => ({ page: "a" }) },
+          capabilities: {},
+        },
+      });
+    }
+  }, body);
+}
+
+// Answers every round with the given reply.
+export async function reply(page: Page, reply: unknown) {
+  await page.route(ROUND, (route) =>
+    route.fulfill({ json: { requestId: "r1", reply } }),
+  );
+}
+
+// Holds every round until the test answers it.
+export async function holdRounds(page: Page) {
+  const routes: Route[] = [];
+  await page.route(ROUND, (route) => {
+    routes.push(route);
+  });
+  return routes;
+}
+
+export function submit(page: Page, text: string) {
+  return page.evaluate(
+    (value) =>
+      (
+        document.querySelector("dicta-action") as unknown as {
+          submit(text: string): void;
+        }
+      ).submit(value),
+    text,
+  );
+}

@@ -26,6 +26,7 @@ Run them after every change.
 - Format and type check: `npm run check`
 - Lint: `npm run lint`
 - Tests: `npm run test`
+- Browser tests: `npm run test:browser` (Chromium, Firefox and WebKit)
 - Build: `npm run build`
 
 `npm run format` fixes formatting.
