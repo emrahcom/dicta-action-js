@@ -63,7 +63,6 @@ CSS parts let the integrator style or hide each part of the element:
 - `indicator`: the progress indicator.
 - `label`: the plan's label.
 - `text`: the text of a question, a confirmation, a stop, an error or an info.
-- `hint`: the hint "Click Continue or Cancel" (Requests).
 - `option`, `continue`, `cancel`, `close`: the buttons.
 - `notice`: a notice (Display).
 
@@ -87,8 +86,8 @@ The element runs one request at a time. `submit(text)`:
 
 - With no request running: starts a new request.
 - While a question is open: answers it.
-- While a confirmation is open: is ignored, and the element shows the hint
-  "Click Continue or Cancel" (Strings) until the confirmation ends.
+- While a confirmation is open: is ignored; only its buttons answer it
+  (`contract-protocol.md`, Added text and cancel).
 - While the element waits for the server or runs a plan: is added text
   (`contract-protocol.md`, Added text and cancel). The client takes all text
   that comes; background speech from an always-open microphone is a known open
@@ -193,7 +192,6 @@ for example with the site's own translations:
 - `continue`: "Continue"
 - `cancel`: "Cancel"
 - `close`: "Close"
-- `confirmHint`: "Click Continue or Cancel"
 - `error`: "Something went wrong"
 - `tooLong`: "The text is too long"
 
