@@ -100,15 +100,22 @@ developers.
 
 The element shows little: the user wants the task done, not to read.
 
-- While the element waits for the server, from the submit on, or runs a plan: a
-  progress indicator, with the label of the running plan when it has one.
-- One Cancel button, from the submit until the request ends, also during a
-  question or a confirmation.
-- A question: its text, its options as buttons and Cancel. A click on an option
-  answers with the option's text.
-- A confirmation: only the texts from the module's `confirm` as plain text,
-  without the plan's label (`contract-plan.md`, Confirmation), and Continue next
-  to Cancel. For a `forEach`, the number of items and the first three items.
+From the submit until the request ends, the element shows one view at a time,
+and each view has a Cancel button in the same place:
+
+- Working, while the element waits for the server or runs a plan: a progress
+  indicator, with the label of the running plan when it has one, and Cancel.
+- Question: the question's text, its options as buttons and Cancel. A click on
+  an option answers with the option's text.
+- Confirmation: only the texts from the module's `confirm` as plain text,
+  without the plan's label (`contract-plan.md`, Confirmation), Continue and
+  Cancel. For a `forEach`, the number of items and the first three items.
+
+An answer or Continue brings back the working view. Cancel in any view cancels
+the request (`contract-protocol.md`, Added text and cancel).
+
+After the request, or beside it:
+
 - A notice: a short text that goes away by itself and never waits for a click:
   the text of a done and the `tooLong` text. It is shown for `notice-duration`
   seconds. While the pointer is over it or it has focus, it stays, and the time
