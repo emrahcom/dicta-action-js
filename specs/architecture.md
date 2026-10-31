@@ -44,6 +44,8 @@ names them without the repo.
   in `dicta-js`. It is called for the first round and again after a `401`; the
   element keeps the token in memory between rounds. Without it, rounds are sent
   without `Authorization`, for a server with authentication turned off.
+- `done-seconds`: how long a done with a text is shown (Display), a whole number
+  from 1, by default 5. Another value is ignored, and 5 applies.
 - `texts`: an optional object that overrides the element's own texts by key
   (Texts).
 - `submit(text)`: a method that passes the user's text. The text is trimmed;
@@ -105,9 +107,10 @@ The element shows little: the user wants the task done, not to read.
 - A confirmation: only the texts from the module's `confirm` as plain text,
   without the plan's label (`contract-plan.md`, Confirmation), and Continue next
   to Cancel. For a `forEach`, the number of items and the first three items.
-- Done with a text: shown for 5 seconds, then it goes away. Done without a text:
-  nothing is shown; the progress indicator goes away. A done never waits for a
-  click.
+- Done with a text: shown for `done-seconds`, then it goes away. While the
+  pointer is over it or it has focus, it stays, and the time starts again when
+  they leave. Done without a text: nothing is shown; the progress indicator goes
+  away. A done never waits for a click.
 - A stop and an error: shown until the user closes them or submits new text.
 - An info: shown with its paragraphs until the user closes it
   (`contract-protocol.md`, Response body).
