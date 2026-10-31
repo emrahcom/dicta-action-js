@@ -94,8 +94,8 @@ The element runs one request at a time. `submit(text)`:
   client takes all text that comes; background speech from an always-open
   microphone is a known open point.
 - From the start of a page load during a request until the page is left: is
-  ignored, and the element shows the `pageLoad` text as a notice (Display;
-  `contract-protocol.md`, Page changes).
+  ignored; the `working` view shows why (Display; `contract-protocol.md`, Page
+  changes).
 - Text over 10000 characters (Unicode code points) is not taken: the element
   shows the `tooLong` text as a notice (Display) and nothing else changes
   (`contract-protocol.md`, Limits).
@@ -119,16 +119,19 @@ cause to the console, such as the server's `error`, for the site's developers.
 The element shows little: the user wants the task done, not to read.
 
 The element shows one view at a time, or none, and notices beside it. A view
-waits for the user; a notice tells something and does not. The name of the view
+belongs to a running request: it shows where the request is and what the user
+can do with it. A notice tells something and does not. The name of the view
 shown is also the element's custom state (Element), for styling.
 
 While a request runs, from the submit on, each view has its own Cancel button,
 placed to fit the view:
 
 - `working`, while the element waits for the server, runs a plan or waits for a
-  page load: a progress indicator, with the label of the running plan when it
-  has one, and Cancel. The indicator is a small spinner drawn with CSS. When the
-  user prefers reduced motion (`prefers-reduced-motion`), it stands still.
+  page load: a progress indicator, a label and Cancel. The label is the running
+  plan's label when it has one, and the `pageLoad` text while the element waits
+  for a page load, announced once when the wait starts. The indicator is a small
+  spinner drawn with CSS. When the user prefers reduced motion
+  (`prefers-reduced-motion`), it stands still.
 - `question`: the question's text, its options as buttons and Cancel. Pressing
   an option answers with the option's text.
 - `confirmation`: only the texts from the module's `confirm` as plain text
@@ -150,8 +153,7 @@ When a request ends, the view goes away and the outcome is a notice:
   (`contract-protocol.md`, Response body);
 - a done without a text shows nothing.
 
-The `tooLong` and `pageLoad` texts are notices too, shown for `notice-duration`
-seconds.
+The `tooLong` text is a notice too, shown for `notice-duration` seconds.
 
 The notices are a list, the newest last. A new notice, or a new request, does
 not hide the ones shown. When a fourth would be shown, the oldest that goes away
@@ -226,8 +228,8 @@ for example with the site's own translations:
 - `items`: "{count} items", the number of items in a `forEach` confirmation, or
   of top-level steps of one write capability (Display); the element puts the
   number in place of `{count}`
-- `pageLoad`: "Wait for the page to load", for text that comes during a page
-  load (Requests)
+- `pageLoad`: "Wait for the page to load", the `working` view's label while the
+  element waits for a page load (Display)
 - `tooLong`: "The text is too long"
 - `working`: "Working", announced only, when a request starts or goes on in a
   new page (Accessibility)
