@@ -88,10 +88,13 @@ The element runs one request at a time. `submit(text)`:
 - While a question is open: answers it.
 - While a confirmation is open: is ignored; only its buttons answer it
   (`contract-protocol.md`, Added text and cancel).
-- While the element waits for the server, runs a plan or waits for a page load:
-  is added text (`contract-protocol.md`, Added text and cancel and Page
-  changes). The client takes all text that comes; background speech from an
-  always-open microphone is a known open point.
+- While the element waits for the server or runs a plan: is added text
+  (`contract-protocol.md`, Added text and cancel). The client takes all text
+  that comes; background speech from an always-open microphone is a known open
+  point.
+- From the start of a page load until the page is left: is ignored, and the
+  element shows the `pageLoad` text as a notice (Display;
+  `contract-protocol.md`, Page changes).
 - Text over 10000 characters (Unicode code points) is not taken: the element
   shows the `tooLong` text as a notice (Display) and nothing else changes
   (`contract-protocol.md`, Limits).
@@ -145,9 +148,10 @@ A done shows no view: with a text, the text is shown as a notice; without one,
 nothing is shown.
 
 A notice is a short text that goes away by itself and never waits for a click:
-the text of a done and the `tooLong` text. It is not a view, so it can be shown
-beside one. It is shown for `notice-duration` seconds. While the pointer is over
-it or it has focus, it stays, and the time starts again when they leave.
+the text of a done, the `tooLong` text and the `pageLoad` text. It is not a
+view, so it can be shown beside one. It is shown for `notice-duration` seconds.
+While the pointer is over it or it has focus, it stays, and the time starts
+again when they leave.
 
 On `pagehide`, the element hides its view and its notice, so a page the browser
 shows again from its back/forward cache shows no request that is over.
@@ -213,6 +217,8 @@ for example with the site's own translations:
 - `error`: "Something went wrong"
 - `items`: "{count} items", the number of items in a `forEach` confirmation
   (Display); the element puts the number in place of `{count}`
+- `pageLoad`: "Wait for the page to load", for text that comes during a page
+  load (Requests)
 - `tooLong`: "The text is too long"
 - `working`: "Working", announced only, when a request starts or goes on in a
   new page (Accessibility)
