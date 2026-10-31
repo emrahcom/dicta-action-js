@@ -177,9 +177,9 @@ The element keeps two entries in the tab's `sessionStorage`, as JSON:
 
 - `dicta-action-saved`: the request saved on `pagehide` while a step runs:
   `savedAt` (milliseconds since 1970, for the 60 second check), `requestId`,
-  `text`, `exchange`, the running plan, the report so far and the running
-  `step`, with `item` and `do` in a `forEach` (`contract-protocol.md`, Page
-  changes).
+  `text`, `exchange`, the running plan and the report so far, with the halt
+  `navigated` at the running step, and `item` and `do` in a `forEach`
+  (`contract-protocol.md`, Page changes).
 - `dicta-action-history`: the finished requests, newest first, each with
   `requestId`, `time`, `text`, `outcome` and `exchange`. At most 20 requests;
   when storage is full, the oldest go first.
