@@ -1,2 +1,2 @@
 // The entry module of dicta-action-js.
-export {};
+export type { Capability, CapabilityModule, Level, Schema } from "./module.ts";
