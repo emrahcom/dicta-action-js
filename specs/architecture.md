@@ -125,9 +125,9 @@ placed to fit the view:
   motion (`prefers-reduced-motion`), it stands still.
 - `question`: the question's text, its options as buttons and Cancel. A click on
   an option answers with the option's text.
-- `confirmation`: only the texts from the module's `confirm` as plain text,
-  without the plan's label (`contract-plan.md`, Confirmation), Continue and
-  Cancel. For a `forEach`, the number of items and the first three items.
+- `confirmation`: only the texts from the module's `confirm` as plain text
+  (`contract-plan.md`, Confirmation), Continue and Cancel. For a `forEach`, the
+  number of items and the first three items.
 
 An answer or Continue brings back `working`. Cancel in any view cancels the
 request (`contract-protocol.md`, Added text and cancel).
