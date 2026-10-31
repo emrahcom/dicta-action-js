@@ -41,9 +41,9 @@ the repo.
   (`contract-capability.md`). The element builds the site context from it once
   (`contract-context.md`).
 - `getToken`: an optional async function that returns the token as a string, as
-  in `dicta-js`. It is called for each round, since tokens expire; the
-  application may cache the token. Without it, rounds are sent without
-  `Authorization`, for a server with authentication turned off.
+  in `dicta-js`. It is called for the first round and again after a `401`; the
+  element keeps the token in memory between rounds. Without it, rounds are sent
+  without `Authorization`, for a server with authentication turned off.
 - `texts`: an optional object that overrides the element's own texts by key
   (Texts).
 - `submit(text)`: a method that passes the user's text. The text is trimmed;
