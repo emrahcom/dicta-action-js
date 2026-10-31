@@ -47,7 +47,7 @@ the site's capability functions, with the user's own rights.
   question is open, the next text the application passes is the answer.
 - Everything shown is short: the user wants the task done, not to read. Only an
   info, the answer to a question about the site, is longer; it stays until the
-  user closes it.
+  user closes it or gives new text.
 - A request goes on on the new page when a step changes the page, and ends when
   the page changes at any other time (`contract-protocol.md` in
   `dicta-action-server`, Page changes).

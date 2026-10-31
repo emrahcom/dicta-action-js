@@ -34,7 +34,7 @@ names them without the repo.
 
 ## Element
 
-- `server`: the origin of `dicta-action-server`, for example
+- `server`: an attribute, the origin of `dicta-action-server`, for example
   `https://example.com`. A path in it is ignored, since all server paths start
   with `/dicta-action/`.
 - `module`: a property, the capability module's default export
@@ -44,8 +44,9 @@ names them without the repo.
   in `dicta-js`. It is called for the first round and again after a `401`; the
   element keeps the token in memory between rounds. Without it, rounds are sent
   without `Authorization`, for a server with authentication turned off.
-- `notice-duration`: how long a notice is shown (Display), in seconds, a whole
-  number from 1, by default 5. Another value is ignored, and 5 applies.
+- `notice-duration`: an attribute, how long a notice is shown (Display), in
+  seconds, a whole number from 1, by default 5. Another value is ignored, and 5
+  applies.
 - `strings`: an optional object that overrides the element's own strings by key
   (Strings).
 - `submit(text)`: a method that passes the user's text. The text is trimmed;
@@ -127,7 +128,7 @@ placed to fit the view:
   an option answers with the option's text.
 - `confirmation`: only the texts from the module's `confirm` as plain text
   (`contract-plan.md`, Confirmation), Continue and Cancel. For a `forEach`, the
-  number of items and the first three items.
+  number of items (the `items` string) and the first three items.
 
 An answer or Continue brings back `working`. Cancel in any view cancels the
 request (`contract-protocol.md`, Added text and cancel).
@@ -198,20 +199,24 @@ for example with the site's own translations:
 - `cancel`: "Cancel"
 - `close`: "Close"
 - `error`: "Something went wrong"
+- `items`: "{count} items", the number of items in a `forEach` confirmation; the
+  element puts the number in place of `{count}`
 - `tooLong`: "The text is too long"
 
 A key left out keeps its English string. An unknown key, or a value that is not
 a string, is ignored. The element reads `strings` each time it shows one, so a
 site that changes its language sets `strings` again.
 
-Texts from the server and from the module's `confirm` are shown as they come.
+Texts from the server and from the module's `confirm` are shown as they come,
+always as plain text, never as HTML.
 
 ## Accessibility
 
 The element meets WCAG 2.2 level AA.
 
-- Everything works by keyboard, with a visible focus indicator. A new
-  confirmation or question moves the focus to its first button.
+- Everything works by keyboard, with a visible focus indicator.
+- The element never moves the focus. A new view does not take it from the site's
+  text field, so Enter there can never press Continue.
 - Progress, questions, confirmations and outcomes are announced through a status
   region, which is separate from the visible parts, so hiding a part does not
   silence it.
