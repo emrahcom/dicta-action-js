@@ -210,9 +210,9 @@ The element keeps two entries in the tab's `sessionStorage`, as JSON:
 
 When the element has its `server` and `module`, it looks for a saved request,
 takes it out and goes on or ends it (`contract-protocol.md`, Page changes). It
-looks only after the page's script that set them has run, so `getToken` and the
-other properties can be set in any order. It looks again when the page is shown
-from the back/forward cache (`pageshow`).
+looks only after the code that set them has finished running, so `getToken` and
+the other properties set with them can be set in any order. It looks again when
+the page is shown from the back/forward cache (`pageshow`).
 
 ## Built-in capabilities
 
