@@ -243,12 +243,11 @@ function repeatedWrites(
 
 // Where a running plan is, for a page change in the middle of it
 // (contract-protocol.md, Page changes): the step, and in a forEach the item
-// and call; whether a call runs now; and the outputs so far.
+// and call; and the outputs so far.
 export type Progress = {
   step: number;
   item?: number;
   do?: number;
-  running: boolean;
   // Whether the running or last call may load a page; only then is a page load
   // looked for (contract-capability.md, Page changes).
   pageLoad?: boolean;
@@ -258,7 +257,7 @@ export type Progress = {
 };
 
 export function newProgress(): Progress {
-  return { step: 1, running: false, included: [] };
+  return { step: 1, included: [] };
 }
 
 // The report of a plan stopped where it is now, with the halt `code`, for a
@@ -330,7 +329,7 @@ export async function runPlan(
           throw new Stopped();
         }
         progress.pageLoad = call.capability.pageLoad === true;
-        outputs.push(await running(progress, () => execute(call)));
+        outputs.push(await execute(call));
       } else {
         const items = resolve(step.forEach, { outputs });
         if (!Array.isArray(items)) {
@@ -402,7 +401,7 @@ export async function runPlan(
               const next =
                 prepared?.[k][j] ?? prepare(call, module, { outputs, item });
               progress.pageLoad = next.capability.pageLoad === true;
-              calls.push(await running(progress, () => execute(next)));
+              calls.push(await execute(next));
             } catch (err) {
               const failure = err as Failure;
               halt = {
@@ -465,16 +464,6 @@ export async function runPlan(
     }
   }
   return report(included, halt);
-}
-
-// Marks a call as running while it runs.
-async function running<T>(progress: Progress, call: () => Promise<T>) {
-  progress.running = true;
-  try {
-    return await call();
-  } finally {
-    progress.running = false;
-  }
 }
 
 // Builds the report: included outputs in step order, halt.outputs last, at

@@ -774,14 +774,12 @@ test("a stop after the last step does not halt", async () => {
 test("the report so far halts at the running step with its outputs", async () => {
   const progress = newProgress();
   let soFar: unknown;
-  let running: boolean | undefined;
   const leaving = moduleWith({
     ...module.capabilities,
     "page.open": {
       level: "write",
       desc: "Opens a page.",
       run: async () => {
-        running = progress.running;
         soFar = reportSoFar(progress, "navigated", "The page changed");
         return null;
       },
@@ -800,8 +798,6 @@ test("the report so far halts at the running step with its outputs", async () =>
     progress,
     () => false,
   );
-  assert.equal(running, true);
-  assert.equal(progress.running, false);
   assert.deepEqual(soFar, {
     outputs: { 1: TASKS },
     halt: { step: 2, code: "navigated", message: "The page changed" },
