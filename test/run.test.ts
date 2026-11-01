@@ -652,6 +652,25 @@ test("a bad item halts the forEach before the user is asked", async () => {
   assert.deepEqual(calls, []);
 });
 
+test("the halt before asking names the bad item in its message", async () => {
+  const report = await run(
+    { steps: [{ call: "tasks.list", args: {} }, deleteEach] },
+    moduleWith({
+      ...confirmModule(0).capabilities,
+      "tasks.list": {
+        level: "read",
+        desc: "Lists.",
+        run: async () => [{ id: "t1" }, { id: 2 }],
+      },
+    }),
+  );
+  assert.equal(report.halt?.code, "reference");
+  assert.equal(report.halt?.item, undefined);
+  assert.match(report.halt?.message ?? "", /^item 1: /);
+  assert.deepEqual(asked, []);
+  assert.deepEqual(calls, []);
+});
+
 // Added text and cancel (contract-protocol.md, Added text and cancel).
 
 // A stop that answers `value` from the given call on, counting from 1.

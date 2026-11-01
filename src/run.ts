@@ -344,9 +344,19 @@ export async function runPlan(
         // checked first, so a bad item halts it before the user is asked.
         let prepared: Prepared[][] | undefined;
         if (items.length > 0 && asking.includes(true)) {
-          prepared = items.map((item) =>
-            step.do.map((call) => prepare(call, module, { outputs, item })),
-          );
+          // A bad item is named in the message, since no item ran.
+          prepared = items.map((item, k) => {
+            try {
+              return step.do.map((call) =>
+                prepare(call, module, { outputs, item }),
+              );
+            } catch (err) {
+              if (err instanceof Failure) {
+                throw new Failure(err.code, `item ${k}: ${err.message}`);
+              }
+              throw err;
+            }
+          });
           const shown: string[][] = [];
           for (const calls of prepared.slice(0, SHOWN_ITEMS)) {
             const texts: string[] = [];
