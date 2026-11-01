@@ -64,12 +64,12 @@ const STRINGS = {
   close: "Close",
   // Announced only, never shown (specs/architecture.md, Accessibility).
   done: "Done",
-  error: "Something went wrong",
+  errorNotice: "Something went wrong",
   // Announced only, never shown.
   info: "New information",
   items: "{count} items",
   pageLoad: "Wait for the page to load",
-  tooLong: "The text is too long",
+  tooLongNotice: "The text is too long",
   // Announced only, never shown.
   working: "Working",
 };
@@ -374,7 +374,7 @@ export class DictaAction extends HTMLElement {
       return;
     }
     if (Array.from(trimmed).length > MAX_TEXT_CHARS) {
-      this.#addNotice(this.#string("tooLong"));
+      this.#addNotice(this.#string("tooLongNotice"));
       return;
     }
     const request = this.#request;
@@ -614,7 +614,7 @@ export class DictaAction extends HTMLElement {
       `dicta-action: ${err instanceof Error ? err.message : String(err)}`,
     );
     this.#hideView();
-    this.#addNotice(this.#string("error"));
+    this.#addNotice(this.#string("errorNotice"));
   }
 
   // Ends the request. While a plan runs, the running step finishes first and

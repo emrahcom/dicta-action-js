@@ -318,7 +318,7 @@ test("strings override the element's own texts", async ({ page }) => {
   await page.evaluate(() =>
     Object.assign(document.querySelector("dicta-action")!, {
       strings: {
-        error: "Fehler",
+        errorNotice: "Fehler",
         close: "Schliessen",
         unknown: "x",
         cancel: 1,
