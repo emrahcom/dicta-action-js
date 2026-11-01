@@ -163,7 +163,7 @@ Every notice has a Close button, so the user can remove it at once.
 
 The notices are a list, the newest last. A new notice, or a new request, does
 not hide the ones shown. When a fourth would be shown, the oldest that goes away
-by itself goes first; an info never does.
+by itself goes first; only when all three are infos, the oldest info goes.
 
 On `pagehide`, the element hides its view and its notices, so a page the browser
 shows again from its back/forward cache shows no request that is over.
