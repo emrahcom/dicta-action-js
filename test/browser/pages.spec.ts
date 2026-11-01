@@ -1,5 +1,13 @@
 import { expect, type Page, test } from "@playwright/test";
-import { history, holdRounds, replies, ROUND, submit } from "./page.ts";
+import {
+  history,
+  holdRounds,
+  holdStep,
+  replies,
+  ROUND,
+  runs,
+  submit,
+} from "./page.ts";
 
 const list = { call: "tasks.list", args: {} };
 const navigated = { code: "navigated", message: "The page changed" };
@@ -187,6 +195,31 @@ test("a page load at a confirmation ends with a cancelled report", async ({
   await expect(page.getByRole("button", { name: "Continue" })).toBeVisible();
   await openApp(page);
   expect((await history(page))[0]).toMatchObject({
+    outcome: { type: "cancelled" },
+    exchange: [
+      {
+        plan,
+        report: { halt: { step: 1, code: "cancelled", message: "Cancelled" } },
+      },
+    ],
+  });
+});
+
+test("a page left after Cancel while a step runs stores the request", async ({
+  page,
+}) => {
+  const plan = { steps: [list, list] };
+  await replies(page, { type: "plan", plan });
+  await openApp(page);
+  await holdStep(page, "tasks.list");
+  await submit(page, "list");
+  await expect.poll(() => runs(page)).toBe(1);
+  await page.getByRole("button", { name: "Cancel" }).click();
+  await openApp(page);
+  const stored = await history(page);
+  expect(stored).toHaveLength(1);
+  expect(stored[0]).toMatchObject({
+    requestId: "r1",
     outcome: { type: "cancelled" },
     exchange: [
       {

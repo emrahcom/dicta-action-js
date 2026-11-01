@@ -181,6 +181,9 @@ export class DictaAction extends HTMLElement {
   #announcer: HTMLDivElement;
   // The running request; a response for another one is ignored.
   #request: Request | undefined;
+  // The last request cancelled while its plan ran, stored when its running
+  // step returns, or on pagehide when the page is left before that.
+  #cancelled: Request | undefined;
   // Kept between requests, so its token is kept too.
   #client: RoundClient | undefined;
   #clientFor:
@@ -311,6 +314,14 @@ export class DictaAction extends HTMLElement {
       this.#request = undefined;
       request.left = true;
       this.#leave(request);
+    }
+    // A cancelled plan whose step has not returned yet (progress is cleared
+    // when it returns) is stored as cancelled at that step.
+    const cancelled = this.#cancelled;
+    this.#cancelled = undefined;
+    if (cancelled?.progress !== undefined && !cancelled.left) {
+      cancelled.left = true;
+      this.#leave(cancelled);
     }
     // A page the browser shows again from its back/forward cache shows no
     // request that is over.
@@ -637,13 +648,19 @@ export class DictaAction extends HTMLElement {
   }
 
   // Ends the request. While a plan runs, the running step finishes first and
-  // the request is stored with its last report (#runPlan). While it waits for
-  // a page load, it is stored with the report it holds and its added text.
+  // the request is stored with its last report (#runPlan), or on pagehide when
+  // the page is left before that. While it waits for a page load, it is stored
+  // with the report it holds and its added text.
   #cancel() {
     const request = this.#request;
     this.#request = undefined;
     this.#hideView();
-    if (request !== undefined && !planRuns(request)) {
+    if (request === undefined) {
+      return;
+    }
+    if (planRuns(request)) {
+      this.#cancelled = request;
+    } else {
       if (request.phase === "pageLoad") {
         this.#takeAdded(request);
       }
