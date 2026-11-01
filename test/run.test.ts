@@ -343,6 +343,66 @@ test("a step that asks without confirm fails and nothing runs", async () => {
   );
 });
 
+// A module whose capabilities return values that are not plain JSON.
+const odd = moduleWith({
+  ...module.capabilities,
+  "tasks.none": {
+    level: "read",
+    desc: "Returns nothing.",
+    run: async () => undefined,
+  },
+  "tasks.date": {
+    level: "read",
+    desc: "Returns a date.",
+    run: async () => ({ at: new Date(0) }),
+  },
+  "tasks.cycle": {
+    level: "read",
+    desc: "Returns a cyclic object.",
+    args: { type: "object", properties: { id: { type: "string" } } },
+    run: async () => {
+      const task: Record<string, unknown> = { id: "t1" };
+      task.self = task;
+      return task;
+    },
+  },
+});
+
+test("outputs are turned into JSON for references and the report", async () => {
+  const report = await run(
+    {
+      steps: [
+        { call: "tasks.none", args: {}, includeOutput: true },
+        { call: "tasks.date", args: {}, includeOutput: true },
+        { call: "tasks.update", args: { id: "$2.at" } },
+      ],
+    },
+    odd,
+  );
+  const at = new Date(0).toJSON();
+  assert.deepEqual(report, { outputs: { 1: null, 2: { at } } });
+  assert.deepEqual(calls, [["tasks.update", { id: at }]]);
+});
+
+test("an output that is not JSON fails its step with capability", async () => {
+  const halt = { code: "capability", message: "the output is not JSON" };
+  const step = await run({ steps: [{ call: "tasks.cycle", args: {} }] }, odd);
+  assert.deepEqual(step.halt, { step: 1, ...halt });
+  const forEach = await run(
+    {
+      steps: [
+        list,
+        {
+          forEach: "$1",
+          do: [{ call: "tasks.cycle", args: { id: "$item.id" } }],
+        },
+      ],
+    },
+    odd,
+  );
+  assert.deepEqual(forEach.halt, { step: 2, ...halt, item: 0, do: 0 });
+});
+
 test("outputs over 16 KB together are left out with their size", async () => {
   const half = 9000;
   const report = await run({

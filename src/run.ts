@@ -150,11 +150,19 @@ function capabilityFailure(err: unknown) {
   return new Failure(code, message);
 }
 
+// Runs a call and turns its output into JSON at once, so references and the
+// report see the same value (contract-capability.md, Capabilities).
 async function execute({ capability, args }: Prepared) {
+  let output: unknown;
   try {
-    return await capability.run(args);
+    output = await capability.run(args);
   } catch (err) {
     throw capabilityFailure(err);
+  }
+  try {
+    return JSON.parse(JSON.stringify(output) ?? "null") as unknown;
+  } catch {
+    throw new Failure("capability", "the output is not JSON");
   }
 }
 
