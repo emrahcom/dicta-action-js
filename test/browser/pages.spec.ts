@@ -55,6 +55,23 @@ test("a step that loads a page reports navigated at the next step", async ({
   ).toBeNull();
 });
 
+test("a request that goes on sends a getToken set after the module", async ({
+  page,
+}) => {
+  const plan = { steps: [{ call: "page.reload", args: {} }] };
+  const headers: (string | undefined)[] = [];
+  await page.route(ROUND, (route) => {
+    headers.push(route.request().headers().authorization);
+    const reply =
+      headers.length === 1 ? { type: "plan", plan } : { type: "done" };
+    return route.fulfill({ json: { requestId: "r1", reply } });
+  });
+  await openApp(page);
+  await submit(page, "reload");
+  await expect.poll(() => headers.length, { timeout: 10_000 }).toBe(2);
+  expect(headers).toEqual(["Bearer app-token", "Bearer app-token"]);
+});
+
 test("a page load as the last step has no halt", async ({ page }) => {
   const plan = { steps: [list, { call: "page.reload", args: {} }] };
   const bodies = await replies(page, { type: "plan", plan }, { type: "done" });

@@ -362,10 +362,16 @@ export class DictaAction extends HTMLElement {
     this.#store(request, { type: "cancelled" });
   }
 
+  // Looks for a saved request after the running script, so the properties the
+  // page sets with server and module, such as getToken, are in place.
+  #resume() {
+    queueMicrotask(() => this.#resumeNow());
+  }
+
   // Takes a saved request out once the element has its server and module. A
   // recent one goes on with its report and added text in the next round, which
   // sends the new page's state; an older one ends as cancelled.
-  #resume() {
+  #resumeNow() {
     if (
       this.#request !== undefined ||
       !this.getAttribute("server") ||

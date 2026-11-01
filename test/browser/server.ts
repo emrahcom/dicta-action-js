@@ -98,6 +98,8 @@ const APP_PAGE = `<!doctype html>
       },
     },
   };
+  // Set last, as a site may: a request that goes on still sends the token.
+  element.getToken = async () => "app-token";
 </script>`;
 
 async function handle(request: IncomingMessage, response: ServerResponse) {
