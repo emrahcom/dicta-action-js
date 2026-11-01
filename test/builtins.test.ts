@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 import { beforeEach, test } from "node:test";
 import { dictaCapabilities } from "../src/builtins.ts";
 import { addHistory, type HistoryEntry, readHistory } from "../src/history.ts";
+import { saveRequest, takeSaved } from "../src/saved.ts";
 
-// A small session storage for Node, with an optional size limit in bytes.
+// A small session storage for Node, with an optional limit on the length of
+// all its values together.
 class FakeStorage {
   items = new Map<string, string>();
   limit = Infinity;
@@ -11,10 +13,17 @@ class FakeStorage {
     return this.items.get(key) ?? null;
   }
   setItem(key: string, value: string) {
-    if (value.length > this.limit) {
+    let used = value.length;
+    for (const [other, kept] of this.items) {
+      used += other === key ? 0 : kept.length;
+    }
+    if (used > this.limit) {
       throw new Error("QuotaExceededError");
     }
     this.items.set(key, value);
+  }
+  removeItem(key: string) {
+    this.items.delete(key);
   }
 }
 
@@ -67,6 +76,30 @@ test("when storage is full, the oldest go first", () => {
     readHistory().map((e) => e.requestId),
     ["r3", "r2"],
   );
+});
+
+test("the oldest history requests make room for the saved request", () => {
+  for (let n = 1; n <= 5; n++) {
+    addHistory(entry(n, { exchange: [{ added: "x".repeat(100) }] }));
+  }
+  const saved = {
+    savedAt: 1,
+    requestId: "r6",
+    text: "go on",
+    exchange: [{ added: "y".repeat(600) }],
+    added: [],
+  };
+  // The five history requests fit, but not with the saved request; three do.
+  storage.limit =
+    JSON.stringify(saved).length +
+    JSON.stringify(readHistory().slice(0, 3)).length;
+  assert.ok(storage.limit >= JSON.stringify(readHistory()).length);
+  saveRequest(saved);
+  assert.deepEqual(
+    readHistory().map((e) => e.requestId),
+    ["r5", "r4", "r3"],
+  );
+  assert.deepEqual(takeSaved(), saved);
 });
 
 test("storage that cannot be used gives an empty history", () => {

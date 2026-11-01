@@ -40,3 +40,18 @@ export function addHistory(entry: HistoryEntry) {
     }
   }
 }
+
+// Drops the oldest request, to make room in storage. False when none is left
+// or storage cannot be used.
+export function dropOldestHistory() {
+  const list = readHistory();
+  if (list.length === 0) {
+    return false;
+  }
+  try {
+    sessionStorage.setItem(KEY, JSON.stringify(list.slice(0, -1)));
+    return true;
+  } catch {
+    return false;
+  }
+}

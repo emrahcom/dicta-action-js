@@ -1,6 +1,8 @@
 // The request saved when the page is left while it waits for a page load, for
 // the next page to go on with (contract-protocol.md, Page changes).
 
+import { dropOldestHistory } from "./history.ts";
+
 const KEY = "dicta-action-saved";
 
 type Saved = {
@@ -15,12 +17,18 @@ type Saved = {
   added: string[];
 };
 
+// When storage is full, the oldest requests in the history go first; when
+// none is left or storage cannot be used, the request cannot go on.
 export function saveRequest(saved: Saved) {
-  try {
-    sessionStorage.setItem(KEY, JSON.stringify(saved));
-  } catch {
-    // Storage that cannot be used: the request cannot go on.
-  }
+  const value = JSON.stringify(saved);
+  do {
+    try {
+      sessionStorage.setItem(KEY, value);
+      return;
+    } catch {
+      // Full: room is made below.
+    }
+  } while (dropOldestHistory());
 }
 
 // Takes the saved request out, so it goes on at most once.
