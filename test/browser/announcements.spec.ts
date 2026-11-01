@@ -1,5 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
-import { holdRounds, openPage, replies, ROUND, submit } from "./page.ts";
+import { holdRounds, openPage, ROUND, submit } from "./page.ts";
 
 const status = '[role="status"]';
 
@@ -27,19 +27,27 @@ test("Working is announced when a request starts, not shown", async ({
 test("Done is announced for a done without a text, not shown", async ({
   page,
 }) => {
-  await replies(page, { type: "done" });
+  const routes = await holdRounds(page);
   await openPage(page);
   await submit(page, "a");
-  await expect(page.locator(status)).toHaveText("Working Done");
+  await expect(page.locator(status)).toHaveText("Working");
+  await routes[0].fulfill({
+    json: { requestId: "r1", reply: { type: "done" } },
+  });
+  await expect(page.locator(status)).toHaveText("Done");
   expect(await shownText(page)).not.toContain("Done");
   await expect(page.locator('[part~="notice"]')).toBeHidden();
 });
 
 test("a done with a text announces its text, not Done", async ({ page }) => {
-  await replies(page, { type: "done", text: "Moved 2 tasks." });
+  const routes = await holdRounds(page);
   await openPage(page);
   await submit(page, "a");
-  await expect(page.locator(status)).toHaveText("Working Moved 2 tasks.");
+  await expect(page.locator(status)).toHaveText("Working");
+  await routes[0].fulfill({
+    json: { requestId: "r1", reply: { type: "done", text: "Moved 2 tasks." } },
+  });
+  await expect(page.locator(status)).toHaveText("Moved 2 tasks.");
 });
 
 test("strings override Working and Done", async ({ page }) => {
