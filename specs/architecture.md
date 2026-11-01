@@ -187,10 +187,12 @@ The runner follows `contract-plan.md` and builds the report of
 - A page load is seen after each step, and in a `forEach` after each call: a
   `navigate` event of the Navigation API whose destination is another document
   (`destination.sameDocument` is false) since the step or call started. It
-  checks one task after the step or call returns, since WebKit fires the event
-  for `location.reload()` that late. The runner then stops and the element waits
-  for the page to be left (`contract-protocol.md`, Page changes). In a browser
-  without the Navigation API, page loads are not seen and the runner goes on.
+  checks when the step or call returns and, when no event was seen yet, once
+  more one task later, since WebKit fires the event for `location.reload()` that
+  late. A seen event is not waited on: the new page may come first, and the
+  request would end. The runner then stops and the element waits for the page to
+  be left (`contract-protocol.md`, Page changes). In a browser without the
+  Navigation API, page loads are not seen and the runner goes on.
 - Error messages are cut to 200 characters. Included outputs are counted as the
   UTF-8 bytes of their JSON, at most 16 KB together.
 
