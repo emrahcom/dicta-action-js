@@ -522,8 +522,11 @@ export class DictaAction extends HTMLElement {
           },
           request.progress,
           async () => {
-            // WebKit fires navigate for location.reload() a task later.
-            await new Promise((resolve) => setTimeout(resolve, 0));
+            // A seen page load is not waited on, or the new page may come
+            // first. WebKit fires navigate for location.reload() a task later.
+            if (request.pageLoad !== true) {
+              await new Promise((resolve) => setTimeout(resolve, 0));
+            }
             return this.#request === request && request.pageLoad === true;
           },
         );

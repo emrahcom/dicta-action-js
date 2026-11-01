@@ -81,6 +81,31 @@ test("a page load in a forEach reports its item and call", async ({ page }) => {
   ]);
 });
 
+test("a page load seen at once is not waited on", async ({
+  page,
+  browserName,
+}) => {
+  test.skip(
+    browserName === "webkit",
+    "WebKit fires navigate a task later, so the runner waits",
+  );
+  const plan = { steps: [{ call: "page.reload", args: {} }, list] };
+  const bodies = await replies(page, { type: "plan", plan }, { type: "done" });
+  await openApp(page);
+  // Timers of 0 ms take 2 seconds, so the new page comes before any check
+  // that waits for one.
+  await page.evaluate(() => {
+    const later = window.setTimeout;
+    window.setTimeout = ((handler: TimerHandler, ms?: number) =>
+      later(handler, ms ? ms : 2000)) as typeof window.setTimeout;
+  });
+  await submit(page, "reload");
+  await expect.poll(() => bodies.length, { timeout: 10_000 }).toBe(2);
+  expect(bodies[1].exchange).toEqual([
+    { plan, report: { halt: { step: 2, ...navigated } } },
+  ]);
+});
+
 test("a saved request older than 60 seconds ends as cancelled", async ({
   page,
 }) => {
