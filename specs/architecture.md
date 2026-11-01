@@ -192,6 +192,8 @@ The runner follows `contract-plan.md` and builds the report of
 - Page loads (`contract-protocol.md`, Page changes):
   - A page load is a `navigate` event of the Navigation API for another document
     (`destination.sameDocument` is false).
+  - A download is not one: an event with a `downloadRequest`, and a later one to
+    the same URL, which Firefox fires too.
   - Only a capability with `pageLoad` is checked: the runner looks for one after
     each call of such a capability, and ignores one at any other time.
   - It checks at once. Only when it sees none, it checks once more one task
