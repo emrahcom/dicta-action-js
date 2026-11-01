@@ -97,7 +97,7 @@ The element runs one request at a time. `submit(text)`:
   ignored; the `working` view shows why (Display; `contract-protocol.md`, Page
   changes).
 - Text over 10000 characters (Unicode code points) is not taken: the element
-  shows the `tooLong` text as a notice (Display) and nothing else changes
+  shows the `tooLongNotice` text as a notice (Display) and nothing else changes
   (`contract-protocol.md`, Limits).
 
 The text becomes the request's `text`, a question's `answer` or an `added` item
@@ -153,7 +153,7 @@ When a request ends, the view goes away and the outcome is a notice:
   (`contract-protocol.md`, Response body);
 - a done without a text shows nothing.
 
-The `tooLong` text is a notice that goes away by itself too.
+The `tooLongNotice` text is a notice that goes away by itself too.
 
 A notice that goes away by itself is shown for `notice-duration` seconds or for
 the reading time of its text, one second for every three words, whichever is
@@ -237,7 +237,7 @@ for example with the site's own translations:
 - `cancel`: "Cancel"
 - `close`: "Close", for a notice
 - `done`: "Done", announced only, for a done without a text (Accessibility)
-- `error`: "Something went wrong"
+- `errorNotice`: "Something went wrong"
 - `info`: "New information", announced only, when an info is shown
   (Accessibility)
 - `items`: "{count} items", the number of items in a `forEach` confirmation, or
@@ -245,7 +245,7 @@ for example with the site's own translations:
   number in place of `{count}`
 - `pageLoad`: "Wait for the page to load", the `working` view's label while the
   element waits for a page load (Display)
-- `tooLong`: "The text is too long"
+- `tooLongNotice`: "The text is too long"
 - `working`: "Working", announced only, when a request starts or goes on in a
   new page (Accessibility)
 
