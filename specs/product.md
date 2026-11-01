@@ -3,9 +3,9 @@
 dicta actions let users tell a web application what they want, in their own
 words, and the application does it.
 
-dicta-action-js is the browser side. The application gives it the user's request
-as text; it asks `dicta-action-server` for a plan and runs the plan by calling
-the site's capability functions, with the user's own rights.
+`dicta-action-js` is the browser side. The application gives it the user's
+request as text; it asks `dicta-action-server` for a plan and runs the plan by
+calling the site's capability functions, with the user's own rights.
 
 ## What it is
 
