@@ -212,7 +212,8 @@ The element keeps two entries in the tab's `sessionStorage`, as JSON:
   (`contract-protocol.md`, Page changes).
 - `dicta-action-history`: the finished requests, newest first, each with
   `requestId`, `time`, `text`, `outcome` and `exchange`. At most 20 requests;
-  when storage is full, the oldest go first.
+  when storage is full, the oldest go first, also to make room for the saved
+  request.
 
 When the element has its `server` and `module`, it looks for a saved request,
 takes it out and goes on or ends it (`contract-protocol.md`, Page changes). It
