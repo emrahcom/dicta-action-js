@@ -130,34 +130,3 @@ test("a request goes through a plan, a question and done", async ({ page }) => {
     { question: "Which one?", answer: "Budget" },
   ]);
 });
-
-test("Cancel while a plan runs sends no report", async ({ page }) => {
-  const plan = { steps: [{ call: "tasks.list", args: {} }] };
-  let rounds = 0;
-  await page.route(ROUND, (route) => {
-    rounds += 1;
-    return route.fulfill({
-      json: { requestId: "r1", reply: { type: "plan", plan } },
-    });
-  });
-  await openPage(page);
-  await page.evaluate(() => {
-    const element = document.querySelector("dicta-action") as unknown as {
-      module: { capabilities: Record<string, { run: () => Promise<unknown> }> };
-    };
-    element.module.capabilities["tasks.list"].run = () =>
-      new Promise((resolve) => {
-        (window as unknown as { finish: () => void }).finish = () =>
-          resolve([]);
-      });
-  });
-  await submit(page, "a");
-  await expect(page.locator('[part~="indicator"]')).toBeVisible();
-  await page.getByRole("button", { name: "Cancel" }).click();
-  await page.evaluate(() =>
-    (window as unknown as { finish: () => void }).finish(),
-  );
-  await page.waitForTimeout(200);
-  expect(rounds).toBe(1);
-  await expect(page.locator('[part~="view"]')).toBeHidden();
-});

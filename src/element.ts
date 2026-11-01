@@ -319,7 +319,7 @@ export class DictaAction extends HTMLElement {
     // when it returns) is stored as cancelled at that step.
     const cancelled = this.#cancelled;
     this.#cancelled = undefined;
-    if (cancelled?.progress !== undefined && !cancelled.left) {
+    if (cancelled?.progress !== undefined) {
       cancelled.left = true;
       this.#leave(cancelled);
     }
@@ -508,17 +508,10 @@ export class DictaAction extends HTMLElement {
     }
   }
 
-  // Ends the request with a done, a stop or an info.
-  #end(request: Request, reply: Reply) {
-    if (this.#request === request) {
-      this.#request = undefined;
-    }
-    if (reply.type !== "plan" && reply.type !== "question") {
-      this.#store(request, { type: reply.type, text: reply.text });
-    }
-    if (reply.type === "plan" || reply.type === "question") {
-      return;
-    }
+  // Ends the running request with a done, a stop or an info.
+  #end(request: Request, reply: Exclude<Reply, { type: "plan" | "question" }>) {
+    this.#request = undefined;
+    this.#store(request, { type: reply.type, text: reply.text });
     // The outcome is a notice.
     this.#hideView();
     if (reply.type === "info") {
@@ -680,15 +673,14 @@ export class DictaAction extends HTMLElement {
     if (request.requestId === undefined) {
       return;
     }
-    if (outcome.text === undefined) {
-      delete outcome.text;
-    }
+    // addHistory turns the entry into JSON at once, which drops an empty text
+    // and copies the exchange.
     addHistory({
       requestId: request.requestId,
       time: localTime(new Date()),
       text: request.text,
       outcome,
-      exchange: JSON.parse(JSON.stringify(request.exchange)) as unknown[],
+      exchange: request.exchange,
     });
   }
 
