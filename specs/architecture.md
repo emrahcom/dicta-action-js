@@ -44,9 +44,6 @@ names them without the repo.
   in `dicta-js`. It is called for the first round and again after a `401`; the
   element keeps the token in memory between rounds. Without it, rounds are sent
   without `Authorization`, for a server with authentication turned off.
-- `notice-duration`: an attribute, the shortest time a notice that goes away by
-  itself is shown (Display), in seconds, a whole number from 1, by default 5.
-  Another value is ignored, and 5 applies.
 - `strings`: an optional object that overrides the element's own strings by key
   (Strings).
 - `submit(text)`: a method that passes the user's text. The text is trimmed;
@@ -148,27 +145,19 @@ request (`contract-protocol.md`, Added text and cancel).
 
 When a request ends, the view goes away and the outcome is a notice:
 
-- a stop, an error or a done with a text: the text, shown as a notice that goes
-  away by itself;
-- an info: the text, in its paragraphs, shown until the user closes it
-  (`contract-protocol.md`, Response body);
+- a stop, an error or a done with a text: the text;
+- an info: the text, in its paragraphs (`contract-protocol.md`, Response body);
 - a done without a text shows nothing.
 
-The `tooLongNotice` and `useButtonsNotice` texts are notices that go away by
-themselves too.
+The `tooLongNotice` and `useButtonsNotice` texts are notices too.
 
-A notice that goes away by itself is shown for `notice-duration` seconds or for
-the reading time of its text, one second for every three words, whichever is
-longer. While the pointer is over it or it has focus, its time stops, and it
-goes on when they leave.
+An info stays until the user closes it. Any other notice stays until the user
+closes it or a new request starts. Every notice has a Close button.
 
-Every notice has a Close button, so the user can remove it at once.
-
-The notices are a list, the newest last. A new notice, or a new request, does
-not hide the ones shown. When a fourth would be shown, the oldest that goes away
-by itself goes first. Only an info removes an info: when all three are infos, a
-new info removes the oldest, and a notice that goes away by itself is shown as a
-fourth until it goes.
+The notices are a list, the newest last. When a fourth would be shown, the
+oldest that is not an info goes first. Only an info removes an info: when all
+three are infos, a new info removes the oldest, and another notice is shown as a
+fourth.
 
 On `pagehide`, the element hides its view and its notices, so a page the browser
 shows again from its back/forward cache shows no request that is over.
