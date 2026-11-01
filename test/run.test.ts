@@ -859,15 +859,20 @@ test("the report so far in a forEach has its item, call and outputs", async () =
 
 // A page load during a step (contract-protocol.md, Page changes).
 
-// Runs a plan whose page.open starts a page load when its id is `at`.
+// Runs a plan whose page.open starts a page load when its id is `at`. The
+// steps after which the page load check ran are in `checked`.
+const checked: (number | string)[] = [];
 async function runWithPageLoad(plan: Plan, at = "t1") {
   calls.length = 0;
+  checked.length = 0;
   let loading = false;
+  const progress = newProgress();
   const loads = moduleWith({
     ...module.capabilities,
     "page.open": {
       level: "write",
       desc: "Opens a page.",
+      pageLoad: true,
       args: { type: "object", properties: { id: { type: "string" } } },
       run: async (args) => {
         calls.push(["page.open", args]);
@@ -881,8 +886,12 @@ async function runWithPageLoad(plan: Plan, at = "t1") {
     loads,
     ask,
     () => undefined,
-    newProgress(),
-    () => loading,
+    progress,
+    () => {
+      const { step, item, do: call } = progress;
+      checked.push(item === undefined ? step : `${step}.${item}.${call}`);
+      return loading;
+    },
   );
 }
 
@@ -969,6 +978,36 @@ test("a page load at the end of a forEach halts at the next step", async () => {
   );
   assert.deepEqual(report.halt, { step: 3, ...navigated });
   assert.equal(calls.length, 3);
+});
+
+test("a page load is looked for only after a call that may load one", async () => {
+  const report = await runWithPageLoad(
+    {
+      steps: [
+        list,
+        { call: "page.open", args: { id: "t1" } },
+        {
+          forEach: "$1",
+          do: [
+            { call: "page.open", args: { id: "$item.id" } },
+            { call: "tasks.update", args: { id: "$item.id" } },
+          ],
+        },
+        {
+          forEach: "$1",
+          do: [
+            { call: "tasks.update", args: { id: "$item.id" } },
+            { call: "page.open", args: { id: "$item.id" } },
+          ],
+        },
+        list,
+      ],
+    },
+    "none",
+  );
+  assert.deepEqual(report, {});
+  // After each call of page.open and no other.
+  assert.deepEqual(checked, [2, "3.0.0", "3.1.0", "4.0.1", "4.1.1"]);
 });
 
 // Many top-level steps of one write capability (contract-plan.md,

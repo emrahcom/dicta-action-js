@@ -264,15 +264,32 @@ export class DictaAction extends HTMLElement {
     navigationApi()?.removeEventListener("navigate", this.#onNavigate);
   }
 
-  // A page load, to another document, that starts while a plan runs
-  // (specs/architecture.md, Plan runner). Without the Navigation API it is not
-  // seen.
+  // The URLs of downloads, since Firefox fires a second navigate for each,
+  // without its downloadRequest.
+  #downloads = new Set<string>();
+
+  // A page load, to another document, that starts while a plan runs, during or
+  // just after a call that may load a page (specs/architecture.md, Plan
+  // runner). Any other, and a download, is ignored. Without the Navigation API
+  // it is not seen.
   #onNavigate = (event: Event) => {
     const request = this.#request;
-    const { destination } = event as Event & {
-      destination: { sameDocument: boolean };
+    const { destination, downloadRequest } = event as Event & {
+      destination: { sameDocument: boolean; url: string };
+      downloadRequest?: string | null;
     };
-    if (request?.phase === "running" && !destination.sameDocument) {
+    if (typeof downloadRequest === "string") {
+      this.#downloads.add(destination.url);
+      return;
+    }
+    if (this.#downloads.delete(destination.url)) {
+      return;
+    }
+    if (
+      request?.phase === "running" &&
+      request.progress?.pageLoad === true &&
+      !destination.sameDocument
+    ) {
       request.pageLoad = true;
     }
   };

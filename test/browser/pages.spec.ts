@@ -287,3 +287,75 @@ test("a hash change does not stop the plan", async ({ page }) => {
     { plan, report: { outputs: { 2: [{ id: "t1" }, { id: "t2" }] } } },
   ]);
 });
+
+test("a download does not stop the plan", async ({ page }) => {
+  const plan = {
+    steps: [
+      { call: "file.save", args: {} },
+      { ...list, includeOutput: true },
+    ],
+  };
+  const bodies = await replies(page, { type: "plan", plan }, { type: "done" });
+  await openApp(page);
+  const download = page.waitForEvent("download");
+  await submit(page, "save");
+  expect((await download).suggestedFilename()).toBe("tasks.csv");
+  await expect.poll(() => bodies.length).toBe(2);
+  expect(bodies[1].exchange).toEqual([
+    { plan, report: { outputs: { 2: [{ id: "t1" }, { id: "t2" }] } } },
+  ]);
+});
+
+test("a download before a step that loads no page does not stop the plan", async ({
+  page,
+}) => {
+  const plan = {
+    steps: [
+      { call: "file.save", args: {} },
+      { call: "page.stay", args: {} },
+      { ...list, includeOutput: true },
+    ],
+  };
+  const bodies = await replies(page, { type: "plan", plan }, { type: "done" });
+  await openApp(page);
+  await submit(page, "save");
+  await expect.poll(() => bodies.length).toBe(2);
+  expect(bodies[1].exchange).toEqual([
+    { plan, report: { outputs: { 3: [{ id: "t1" }, { id: "t2" }] } } },
+  ]);
+});
+
+test("a page load without pageLoad ends the request as cancelled", async ({
+  page,
+}) => {
+  const plan = { steps: [{ call: "page.reloadUnmarked", args: {} }, list] };
+  let rounds = 0;
+  // Only the first round is answered, so the request is still running when
+  // the page is left.
+  await page.route(ROUND, (route) => {
+    rounds += 1;
+    if (rounds === 1) {
+      return route.fulfill({
+        json: { requestId: "r1", reply: { type: "plan", plan } },
+      });
+    }
+  });
+  await openApp(page);
+  await submit(page, "reload");
+  await page.waitForEvent("load");
+  await page.waitForFunction(
+    () =>
+      (document.querySelector("dicta-action") as unknown as { module?: object })
+        ?.module !== undefined,
+  );
+  expect((await history(page))[0]).toMatchObject({
+    requestId: "r1",
+    outcome: { type: "cancelled" },
+  });
+  // The new page does not go on with it.
+  await page.waitForTimeout(200);
+  expect(rounds).toBeLessThanOrEqual(2);
+  expect(
+    await page.evaluate(() => sessionStorage.getItem("dicta-action-saved")),
+  ).toBeNull();
+});

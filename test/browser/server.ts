@@ -46,6 +46,7 @@ const APP_PAGE = `<!doctype html>
       "page.reload": {
         level: "write",
         desc: "Loads the page again; steps after it do not run.",
+        pageLoad: true,
         args: { type: "object", properties: { id: { type: "string" } } },
         run: async () => {
           location.reload();
@@ -55,9 +56,37 @@ const APP_PAGE = `<!doctype html>
       "page.reloadLater": {
         level: "write",
         desc: "Loads the page again later; steps after it do not run.",
+        pageLoad: true,
         run: async () => {
           await new Promise((resolve) => (window.release = resolve));
           location.reload();
+        },
+      },
+      // Loads the page again without saying it may.
+      "page.reloadUnmarked": {
+        level: "write",
+        desc: "Loads the page again.",
+        run: async () => {
+          location.reload();
+        },
+      },
+      // May load a page, but does not.
+      "page.stay": {
+        level: "read",
+        desc: "May load a page.",
+        pageLoad: true,
+        run: async () => ({}),
+      },
+      // Saves a file from a Blob.
+      "file.save": {
+        level: "read",
+        desc: "Saves the tasks as a file.",
+        run: async () => {
+          const link = document.createElement("a");
+          link.href = URL.createObjectURL(new Blob(["t1,t2"]));
+          link.download = "tasks.csv";
+          link.click();
+          return { name: "tasks.csv" };
         },
       },
       "page.hash": {

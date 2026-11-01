@@ -19,6 +19,9 @@ export type Capability = {
   desc: string;
   args?: Schema;
   output?: Schema;
+  // True when the capability may load a page (contract-capability.md, Page
+  // changes).
+  pageLoad?: boolean;
   // Method syntax, so a capability may name its own argument type.
   run(args: Record<string, unknown>): Promise<unknown>;
   confirm?(args: Record<string, unknown>): Promise<string>;

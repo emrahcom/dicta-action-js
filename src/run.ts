@@ -249,6 +249,9 @@ export type Progress = {
   item?: number;
   do?: number;
   running: boolean;
+  // Whether the running or last call may load a page; only then is a page load
+  // looked for (contract-capability.md, Page changes).
+  pageLoad?: boolean;
   included: [number, unknown][];
   // The forEach's output so far, when its step has includeOutput.
   output?: unknown[][];
@@ -280,8 +283,8 @@ export function reportSoFar(
 // Runs a plan that passed checkPlan and returns its report. When the user
 // cancels at a confirmation, the halt has the code `cancelled`. `stop` is
 // asked between steps, and in a forEach between items; a step or an item that
-// started always finishes. `pageLoad` is asked after each step, and in a
-// forEach after each call: when a page load started, nothing after it runs and
+// started always finishes. `pageLoad` is asked after each call of a capability
+// that may load a page: when a page load started, nothing after it runs and
 // the halt has the code `navigated` at the first step, item or call left, or
 // there is no halt when none is left.
 export async function runPlan(
@@ -304,6 +307,7 @@ export async function runPlan(
     progress.item = undefined;
     progress.do = undefined;
     progress.output = undefined;
+    progress.pageLoad = false;
     const stopped = stop();
     if (stopped) {
       halt = stopHalt(number, stopped);
@@ -325,6 +329,7 @@ export async function runPlan(
           halt = stopHalt(number, "cancelled");
           throw new Stopped();
         }
+        progress.pageLoad = call.capability.pageLoad === true;
         outputs.push(await running(progress, () => execute(call)));
       } else {
         const items = resolve(step.forEach, { outputs });
@@ -394,14 +399,10 @@ export async function runPlan(
             progress.item = k;
             progress.do = j;
             try {
-              calls.push(
-                await running(progress, () =>
-                  execute(
-                    prepared?.[k][j] ??
-                      prepare(call, module, { outputs, item }),
-                  ),
-                ),
-              );
+              const next =
+                prepared?.[k][j] ?? prepare(call, module, { outputs, item });
+              progress.pageLoad = next.capability.pageLoad === true;
+              calls.push(await running(progress, () => execute(next)));
             } catch (err) {
               const failure = err as Failure;
               halt = {
@@ -417,7 +418,11 @@ export async function runPlan(
               throw err;
             }
             const lastCall = j === step.do.length - 1;
-            if (!(lastCall && k === items.length - 1) && (await pageLoad())) {
+            if (
+              !(lastCall && k === items.length - 1) &&
+              progress.pageLoad &&
+              (await pageLoad())
+            ) {
               // The next call, or the first call of the next item.
               halt = {
                 step: number,
@@ -448,7 +453,7 @@ export async function runPlan(
     if (step.includeOutput) {
       included.push([number, outputs[i]]);
     }
-    if (await pageLoad()) {
+    if (progress.pageLoad && (await pageLoad())) {
       if (number < plan.steps.length) {
         halt = {
           step: number + 1,
