@@ -66,7 +66,7 @@ CSS parts let the integrator style or hide each part of the element:
 - `text`: the text of a question or a confirmation.
 - `option`, `continue`, `cancel`: the buttons of a view.
 - `notice`: each notice (Display).
-- `close`: the Close button of an info notice.
+- `close`: the Close button of a notice.
 
 While a view is shown, the element has a custom state with the view's name
 (Display): `working`, `question` or `confirmation`. With the state, a part is
@@ -148,7 +148,7 @@ When a request ends, the view goes away and the outcome is a notice:
 
 - a stop, an error or a done with a text: the text, shown as a notice that goes
   away by itself;
-- an info: the text, in its paragraphs, and Close, until the user closes it
+- an info: the text, in its paragraphs, shown until the user closes it
   (`contract-protocol.md`, Response body);
 - a done without a text shows nothing.
 
@@ -156,12 +156,14 @@ The `tooLong` text is a notice that goes away by itself too.
 
 A notice that goes away by itself is shown for `notice-duration` seconds or for
 the reading time of its text, one second for every three words, whichever is
-longer.
+longer. While the pointer is over it or it has focus, its time stops, and it
+goes on when they leave.
+
+Every notice has a Close button, so the user can remove it at once.
 
 The notices are a list, the newest last. A new notice, or a new request, does
 not hide the ones shown. When a fourth would be shown, the oldest that goes away
-by itself goes first; an info never does. While the pointer is over a notice or
-it has focus, it stays, and its time starts again when they leave.
+by itself goes first; an info never does.
 
 On `pagehide`, the element hides its view and its notices, so a page the browser
 shows again from its back/forward cache shows no request that is over.
@@ -223,7 +225,7 @@ for example with the site's own translations:
 
 - `continue`: "Continue"
 - `cancel`: "Cancel"
-- `close`: "Close", for an info notice
+- `close`: "Close", for a notice
 - `done`: "Done", announced only, for a done without a text (Accessibility)
 - `error`: "Something went wrong"
 - `info`: "New information", announced only, when an info is shown
@@ -252,7 +254,7 @@ The element meets WCAG 2.2 level AA.
 - The element never takes the focus from outside it. A new view does not take it
   from the site's text field, so Enter there can never press Continue.
 - When a view goes away while the focus is in it, the focus moves to the next
-  view's Cancel. When no view follows, or an info is closed with the focus on
+  view's Cancel. When no view follows, or a notice is closed with the focus on
   its Close, the focus goes back to the page element it came from into the
   element, usually the site's text field. If that one is gone, it goes to the
   `<dicta-action>` element itself (`tabindex="-1"`).
