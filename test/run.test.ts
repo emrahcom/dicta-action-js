@@ -319,6 +319,30 @@ test("a capability code that is a client code is reported as capability", async 
   });
 });
 
+test("a step that asks without confirm fails and nothing runs", async () => {
+  const report = await run(
+    { steps: [list, { call: "tasks.remove", args: {} }] },
+    moduleWith({
+      ...module.capabilities,
+      "tasks.remove": {
+        level: "destructive",
+        desc: "Removes all tasks.",
+        run: recorder("tasks.remove", () => null),
+      },
+    }),
+  );
+  assert.deepEqual(report.halt, {
+    step: 2,
+    code: "capability",
+    message: "the capability has no confirm",
+  });
+  assert.deepEqual(asked, []);
+  assert.deepEqual(
+    calls.map(([name]) => name),
+    ["tasks.list"],
+  );
+});
+
 test("outputs over 16 KB together are left out with their size", async () => {
   const half = 9000;
   const report = await run({
