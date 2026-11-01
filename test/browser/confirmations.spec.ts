@@ -3,6 +3,7 @@ import { deleted, holdStep, openPage, replies, submit } from "./page.ts";
 
 const done = { type: "done" };
 const text = '[part~="text"]';
+const notice = '[part~="notice"]';
 
 function inState(page: Page, state: string) {
   return page.evaluate(
@@ -57,16 +58,45 @@ test("Cancel ends the request without running the step", async ({ page }) => {
   expect(bodies.length).toBe(1);
 });
 
-test("text during a confirmation is ignored", async ({ page }) => {
+test("text during a confirmation is ignored with a notice", async ({
+  page,
+}) => {
   const bodies = await replies(page, deleteOne, done);
   await openPage(page);
   await submit(page, "delete it");
   await expect(page.locator(text)).toHaveText("Delete task t1");
   await submit(page, "yes");
-  await page.waitForTimeout(200);
+  await expect(page.locator(`${notice} .text`)).toHaveText(
+    "Answer with the buttons",
+  );
+  await expect(page.locator('[role="status"]')).toHaveText(
+    /Answer with the buttons$/,
+  );
   expect(await inState(page, "confirmation")).toBe(true);
   expect(await deleted(page)).toEqual([]);
   expect(bodies.length).toBe(1);
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect.poll(() => bodies.length).toBe(2);
+  expect(await deleted(page)).toEqual(["t1"]);
+  expect(bodies[1].exchange).toEqual([{ plan: deleteOne.plan, report: {} }]);
+});
+
+test("strings override the notice for text during a confirmation", async ({
+  page,
+}) => {
+  await replies(page, deleteOne, done);
+  await openPage(page);
+  await page.evaluate(() =>
+    Object.assign(document.querySelector("dicta-action")!, {
+      strings: { useButtonsNotice: "Bitte die Knoepfe nutzen" },
+    }),
+  );
+  await submit(page, "delete it");
+  await expect(page.locator(text)).toHaveText("Delete task t1");
+  await submit(page, "ja");
+  await expect(page.locator(`${notice} .text`)).toHaveText(
+    "Bitte die Knoepfe nutzen",
+  );
 });
 
 function deleteEach() {

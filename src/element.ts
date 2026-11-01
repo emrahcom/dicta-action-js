@@ -70,6 +70,7 @@ const STRINGS = {
   items: "{count} items",
   pageLoad: "Wait for the page to load",
   tooLongNotice: "The text is too long",
+  useButtonsNotice: "Answer with the buttons",
   // Announced only, never shown.
   working: "Working",
 };
@@ -394,10 +395,13 @@ export class DictaAction extends HTMLElement {
       void this.#round(this.#request);
     } else if (request.phase === "question") {
       this.#answer(request, trimmed);
-    } else if (request.phase !== "confirmation") {
+    } else if (request.phase === "confirmation") {
+      // Only the buttons answer a confirmation (contract-protocol.md, Added
+      // text and cancel); the notice says so.
+      this.#addNotice(this.#string("useButtonsNotice"));
+    } else {
       // The request is waiting for the server or running a plan (contract-
-      // protocol.md, Added text and cancel). During a confirmation, text is
-      // ignored.
+      // protocol.md, Added text and cancel).
       request.added.push(trimmed);
     }
   }
