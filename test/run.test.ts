@@ -79,6 +79,13 @@ const module = moduleWith({
       throw new Error("x".repeat(300));
     },
   },
+  "tasks.invalid": {
+    level: "write",
+    desc: "Throws with a client code.",
+    run: async () => {
+      throw Object.assign(new Error("Bad input"), { code: "invalid" });
+    },
+  },
   "tasks.big": {
     level: "read",
     desc: "Returns a large output.",
@@ -301,6 +308,15 @@ test("a capability error without a code is capability, cut to 200", async () => 
   assert.equal(report.halt?.step, 2);
   assert.equal(report.halt?.code, "capability");
   assert.equal(report.halt?.message, "x".repeat(200));
+});
+
+test("a capability code that is a client code is reported as capability", async () => {
+  const report = await run({ steps: [{ call: "tasks.invalid", args: {} }] });
+  assert.deepEqual(report.halt, {
+    step: 1,
+    code: "capability",
+    message: "Bad input",
+  });
 });
 
 test("outputs over 16 KB together are left out with their size", async () => {

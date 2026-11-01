@@ -126,11 +126,26 @@ function prepare(
   return { capability, args };
 }
 
-// A capability's own string code is reported, otherwise `capability`
-// (contract-capability.md, Errors).
+// The client's own halt codes (contract-protocol.md, Report).
+const CLIENT_CODES = new Set([
+  "capability",
+  "reference",
+  "limit",
+  "invalid",
+  "cancelled",
+  "interrupted",
+  "navigated",
+]);
+
+// A capability's own string code is reported, unless it is one of the
+// client's own; otherwise `capability` (contract-capability.md, Errors).
 function capabilityFailure(err: unknown) {
   const code =
-    isContainer(err) && typeof err.code === "string" ? err.code : "capability";
+    isContainer(err) &&
+    typeof err.code === "string" &&
+    !CLIENT_CODES.has(err.code)
+      ? err.code
+      : "capability";
   const message = err instanceof Error ? err.message : String(err);
   return new Failure(code, message);
 }
