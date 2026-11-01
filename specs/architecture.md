@@ -110,9 +110,10 @@ Before each round the element calls `module.state.run()` for `state` and takes
 A round is `POST <server>/dicta-action/v1/round`. A `401` gets a new token and
 one more try with the same body. Every other HTTP error, a network failure, a
 round without a response after 60 seconds, a reply type the element does not
-know and a `getToken` or `module.state.run()` that throws end the request as an
-error, with no retry (`contract-protocol.md`, Errors). The element logs the
-cause to the console, such as the server's `error`, for the site's developers.
+know, a `getToken` or `module.state.run()` that throws and a request started
+before the element has its `server` and `module` end the request as an error,
+with no retry (`contract-protocol.md`, Errors). The element logs the cause to
+the console, such as the server's `error`, for the site's developers.
 
 ## Display
 
