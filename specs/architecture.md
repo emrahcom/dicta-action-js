@@ -88,7 +88,8 @@ The element runs one request at a time. `submit(text)`:
 - With no request running: starts a new request.
 - While a question is open: answers it.
 - While a confirmation is open: is ignored; only its buttons answer it
-  (`contract-protocol.md`, Added text and cancel).
+  (`contract-protocol.md`, Added text and cancel). The element shows the
+  `useButtonsNotice` text as a notice (Display).
 - While the element waits for the server or runs a plan, before a page load
   starts: is added text (`contract-protocol.md`, Added text and cancel). The
   client takes all text that comes; background speech from an always-open
@@ -153,7 +154,8 @@ When a request ends, the view goes away and the outcome is a notice:
   (`contract-protocol.md`, Response body);
 - a done without a text shows nothing.
 
-The `tooLongNotice` text is a notice that goes away by itself too.
+The `tooLongNotice` and `useButtonsNotice` texts are notices that go away by
+themselves too.
 
 A notice that goes away by itself is shown for `notice-duration` seconds or for
 the reading time of its text, one second for every three words, whichever is
@@ -246,6 +248,7 @@ for example with the site's own translations:
 - `pageLoad`: "Wait for the page to load", the `working` view's label while the
   element waits for a page load (Display)
 - `tooLongNotice`: "The text is too long"
+- `useButtonsNotice`: "Answer with the buttons"
 - `working`: "Working", announced only, when a request starts or goes on in a
   new page (Accessibility)
 
