@@ -76,11 +76,8 @@ const STRINGS = {
 };
 type StringKey = keyof typeof STRINGS;
 
-const DEFAULT_NOTICE_SECONDS = 5;
 // The most notices shown at once.
 const MAX_NOTICES = 3;
-// The reading time of a notice: one second for every this many words.
-const WORDS_PER_SECOND = 3;
 // The longest text taken, in Unicode code points (contract-protocol.md,
 // Limits).
 const MAX_TEXT_CHARS = 10000;
@@ -178,7 +175,7 @@ export class DictaAction extends HTMLElement {
   #view: HTMLDivElement;
   // The notices shown, the newest last (specs/architecture.md, Display).
   #notices: HTMLDivElement;
-  // The notices with a Close button, which never go away by themselves.
+  // The infos shown, which stay until the user closes them.
   #infos = new WeakSet<HTMLElement>();
   // Announces to screen readers, separate from the visible parts.
   #announcer: HTMLDivElement;
@@ -402,6 +399,7 @@ export class DictaAction extends HTMLElement {
       return;
     }
     if (request === undefined) {
+      this.#removeNotices();
       this.#request = {
         text: trimmed,
         exchange: [],
@@ -504,7 +502,7 @@ export class DictaAction extends HTMLElement {
     if (reply.type === "plan" || reply.type === "question") {
       return;
     }
-    // The outcome is a notice; a new request does not hide it.
+    // The outcome is a notice.
     this.#hideView();
     if (reply.type === "info") {
       this.#addNotice(reply.text, true);
@@ -810,9 +808,9 @@ export class DictaAction extends HTMLElement {
     }
   }
 
-  // Shows a notice after the ones shown. An info has its paragraphs and Close
-  // and stays until closed; any other notice goes away by itself. With more
-  // than three, the oldest that goes away by itself goes first.
+  // Shows a notice after the ones shown. An info stays until it is closed; any
+  // other notice until it is closed or a new request starts. With more than
+  // three, the oldest that is not an info goes first.
   #addNotice(text: string, info = false) {
     const notice = document.createElement("div");
     notice.className = "notice";
@@ -831,11 +829,10 @@ export class DictaAction extends HTMLElement {
       // An info can be long: only the info string is announced.
       this.#announce(this.#string("info"));
     } else {
-      this.#timeNotice(notice, text);
       this.#announce(text);
     }
-    // The oldest that goes away by itself goes first; only an info removes an
-    // info, so with three infos another notice is shown as a fourth.
+    // Only an info removes an info, so with three infos another notice is
+    // shown as a fourth.
     const shown = Array.from(this.#notices.children) as HTMLElement[];
     while (shown.length >= MAX_NOTICES) {
       const index = shown.findIndex((element) => !this.#infos.has(element));
@@ -848,48 +845,13 @@ export class DictaAction extends HTMLElement {
     this.#notices.append(notice);
   }
 
-  // A notice that goes away by itself: after notice-duration or its reading
-  // time, whichever is longer. While the pointer is over it or the focus is in
-  // it, its time stops, and it goes on when they leave.
-  #timeNotice(notice: HTMLElement, text: string) {
-    const words = text.split(/\s+/).filter(Boolean).length;
-    let left =
-      Math.max(this.#noticeSeconds(), Math.ceil(words / WORDS_PER_SECOND)) *
-      1000;
-    let since = 0;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    let hovered = false;
-    let focused = false;
-    const update = () => {
-      if (hovered || focused) {
-        if (timer !== undefined) {
-          clearTimeout(timer);
-          timer = undefined;
-          left -= Date.now() - since;
-        }
-      } else if (timer === undefined) {
-        since = Date.now();
-        timer = setTimeout(() => this.#removeNotice(notice), left);
+  // Removes the notices that are not infos, when a new request starts.
+  #removeNotices() {
+    for (const notice of Array.from(this.#notices.children) as HTMLElement[]) {
+      if (!this.#infos.has(notice)) {
+        this.#removeNotice(notice);
       }
-    };
-    notice.addEventListener("pointerenter", () => {
-      hovered = true;
-      update();
-    });
-    notice.addEventListener("pointerleave", () => {
-      hovered = false;
-      update();
-    });
-    // focusin and focusout, so the focus on its Close counts too.
-    notice.addEventListener("focusin", () => {
-      focused = true;
-      update();
-    });
-    notice.addEventListener("focusout", () => {
-      focused = false;
-      update();
-    });
-    update();
+    }
   }
 
   // Removes a notice. When the focus was in it, it goes back (#returnFocus).
@@ -902,12 +864,6 @@ export class DictaAction extends HTMLElement {
     if (hadFocus) {
       this.#returnFocus();
     }
-  }
-
-  #noticeSeconds() {
-    const value = this.getAttribute("notice-duration") ?? "";
-    const seconds = /^\d+$/.test(value) ? Number(value) : 0;
-    return seconds >= 1 ? seconds : DEFAULT_NOTICE_SECONDS;
   }
 
   // Clears the status region first and sets the text a moment later, so a

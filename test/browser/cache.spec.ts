@@ -24,8 +24,8 @@ test("pagehide hides the view of a request that is over", async ({ page }) => {
 test("pagehide hides the notices", async ({ page }) => {
   await replies(
     page,
-    { type: "stop", text: "No." },
     { type: "info", text: "Like this." },
+    { type: "stop", text: "No." },
   );
   await openPage(page);
   await submit(page, "a");

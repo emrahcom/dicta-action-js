@@ -1,49 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { openPage, replies, submit } from "./page.ts";
 
-const notice = '[part~="notice"]';
-
-test("the pointer over one notice does not keep the next one", async ({
-  page,
-}) => {
-  await page.clock.install();
-  await replies(
-    page,
-    { type: "done", text: "First." },
-    { type: "done", text: "Second." },
-  );
-  await openPage(page, '<dicta-action notice-duration="1"></dicta-action>');
-  await submit(page, "a");
-  await submit(page, "b");
-  await expect(page.locator(`${notice} .text`)).toHaveText([
-    "First.",
-    "Second.",
-  ]);
-  // Hovered once no view moves the notices any more.
-  await page.locator(notice).first().hover();
-  await page.clock.runFor(1100);
-  await expect(page.locator(`${notice} .text`)).toHaveText(["First."]);
-});
-
-test("the focus on one notice does not keep the next one", async ({ page }) => {
-  await page.clock.install();
-  await replies(
-    page,
-    { type: "done", text: "First." },
-    { type: "done", text: "Second." },
-  );
-  await openPage(page, '<dicta-action notice-duration="1"></dicta-action>');
-  await submit(page, "a");
-  await page.locator(notice).focus();
-  await submit(page, "b");
-  await expect(page.locator(`${notice} .text`)).toHaveText([
-    "First.",
-    "Second.",
-  ]);
-  await page.clock.runFor(1100);
-  await expect(page.locator(`${notice} .text`)).toHaveText(["First."]);
-});
-
 test("an equal text is announced again", async ({ page }) => {
   await replies(
     page,

@@ -82,57 +82,15 @@ test("Cancel ends the request and a late response is ignored", async ({
   await expect(page.locator(view)).toBeHidden();
 });
 
-test("a done with a text is a notice that goes away", async ({ page }) => {
+test("a done with a text is a notice that stays", async ({ page }) => {
   await page.clock.install();
   await reply(page, { type: "done", text: "Moved 2 tasks." });
-  await openPage(page, '<dicta-action notice-duration="2"></dicta-action>');
+  await openPage(page);
   await submit(page, "a");
   await expect(page.locator(`${notice} .text`)).toHaveText("Moved 2 tasks.");
   await expect(page.locator(view)).toBeHidden();
-  await page.clock.runFor(1900);
+  await page.clock.runFor(3_600_000);
   await expect(page.locator(notice)).toBeVisible();
-  await page.clock.runFor(200);
-  await expect(page.locator(notice)).toBeHidden();
-});
-
-test("a notice lasts 5 seconds without a valid duration", async ({ page }) => {
-  await page.clock.install();
-  await reply(page, { type: "done", text: "Done." });
-  await openPage(page, '<dicta-action notice-duration="0"></dicta-action>');
-  await submit(page, "a");
-  await expect(page.locator(notice)).toBeVisible();
-  await page.clock.runFor(4900);
-  await expect(page.locator(notice)).toBeVisible();
-  await page.clock.runFor(200);
-  await expect(page.locator(notice)).toBeHidden();
-});
-
-test("a notice stays while the pointer is over it", async ({ page }) => {
-  await page.clock.install();
-  await reply(page, { type: "done", text: "Done." });
-  await openPage(page, '<dicta-action notice-duration="1"></dicta-action>');
-  await submit(page, "a");
-  await page.locator(notice).hover();
-  await page.clock.runFor(3000);
-  await expect(page.locator(notice)).toBeVisible();
-  await page.mouse.move(0, 0);
-  await page.clock.runFor(900);
-  await expect(page.locator(notice)).toBeVisible();
-  await page.clock.runFor(200);
-  await expect(page.locator(notice)).toBeHidden();
-});
-
-test("a notice stays while it has focus", async ({ page }) => {
-  await page.clock.install();
-  await reply(page, { type: "done", text: "Done." });
-  await openPage(page, '<dicta-action notice-duration="1"></dicta-action>');
-  await submit(page, "a");
-  await page.locator(notice).focus();
-  await page.clock.runFor(3000);
-  await expect(page.locator(notice)).toBeVisible();
-  await page.locator(notice).blur();
-  await page.clock.runFor(1100);
-  await expect(page.locator(notice)).toBeHidden();
 });
 
 test("a done without a text shows nothing", async ({ page }) => {
@@ -143,37 +101,34 @@ test("a done without a text shows nothing", async ({ page }) => {
   await expect(page.locator(notice)).toBeHidden();
 });
 
-test("a stop is a notice that goes away", async ({ page }) => {
+test("a stop is a notice that stays until a new request", async ({ page }) => {
   await page.clock.install();
-  await reply(page, { type: "stop", text: "Not about this site." });
-  await openPage(page, '<dicta-action notice-duration="1"></dicta-action>');
+  await replies(
+    page,
+    { type: "stop", text: "Not about this site." },
+    { type: "info", text: "Help." },
+    { type: "done" },
+  );
+  await openPage(page);
   await submit(page, "a");
   await expect(page.locator(`${notice} .text`)).toHaveText(
     "Not about this site.",
   );
   await expect(page.locator(view)).toBeHidden();
-  await page.clock.runFor(1100);
-  await expect(page.locator(notice)).toHaveCount(0);
-});
-
-test("a long notice stays for its reading time", async ({ page }) => {
-  await page.clock.install();
-  // 30 words: 10 seconds, longer than notice-duration.
-  const text = Array.from({ length: 30 }, () => "word").join(" ");
-  await reply(page, { type: "stop", text });
-  await openPage(page, '<dicta-action notice-duration="1"></dicta-action>');
-  await submit(page, "a");
+  await page.clock.runFor(3_600_000);
   await expect(page.locator(notice)).toBeVisible();
-  await page.clock.runFor(9900);
-  await expect(page.locator(notice)).toBeVisible();
-  await page.clock.runFor(200);
-  await expect(page.locator(notice)).toHaveCount(0);
+  // The next request removes it; an info stays over a new request.
+  await submit(page, "b");
+  await expect(page.locator(`${notice} .text`)).toHaveText("Help.");
+  await submit(page, "c");
+  await expect(page.locator('[part~="indicator"]')).toHaveCount(0);
+  await expect(page.locator(`${notice} .text`)).toHaveText("Help.");
 });
 
 test("an info keeps its paragraphs and stays until Close", async ({ page }) => {
   await page.clock.install();
   await reply(page, { type: "info", text: "First.\n\nSecond." });
-  await openPage(page, '<dicta-action notice-duration="1"></dicta-action>');
+  await openPage(page);
   await submit(page, "a");
   const text = page.locator(`${notice} .text`);
   await expect(text).toHaveText("First.\n\nSecond.", { useInnerText: true });
@@ -197,19 +152,24 @@ test("at most three notices, never dropping an info", async ({ page }) => {
   await replies(
     page,
     { type: "info", text: "Help." },
-    { type: "stop", text: "One." },
-    { type: "stop", text: "Two." },
-    { type: "stop", text: "Three." },
+    {
+      type: "plan",
+      plan: { steps: [{ call: "tasks.delete", args: { id: "t1" } }] },
+    },
   );
   await openPage(page);
-  for (const text of ["a", "b", "c", "d"]) {
+  await submit(page, "a");
+  await expect(page.locator('[part~="indicator"]')).toHaveCount(0);
+  await submit(page, "delete it");
+  await expect(page.getByRole("button", { name: "Continue" })).toBeVisible();
+  // Each text during the confirmation adds a notice.
+  for (const text of ["x", "y", "z"]) {
     await submit(page, text);
-    await expect(page.locator('[part~="indicator"]')).toHaveCount(0);
   }
   await expect(page.locator(`${notice} .text`)).toHaveText([
     "Help.",
-    "Two.",
-    "Three.",
+    "Answer with the buttons",
+    "Answer with the buttons",
   ]);
 });
 
@@ -237,9 +197,7 @@ test("with three infos, a new info removes the oldest", async ({ page }) => {
   ]);
 });
 
-test("with three infos, a stop is shown as a fourth until it goes", async ({
-  page,
-}) => {
+test("with three infos, a stop is shown as a fourth", async ({ page }) => {
   await page.clock.install();
   await submitAll(page, [
     { type: "info", text: "One." },
@@ -253,15 +211,12 @@ test("with three infos, a stop is shown as a fourth until it goes", async ({
     "Three.",
     "No.",
   ]);
-  await page.clock.runFor(60_000);
-  await expect(page.locator(`${notice} .text`)).toHaveText([
-    "One.",
-    "Two.",
-    "Three.",
-  ]);
+  // It stays too.
+  await page.clock.runFor(3_600_000);
+  await expect(page.locator(notice)).toHaveCount(4);
 });
 
-test("a new info removes that fourth and then the oldest info", async ({
+test("a new request removes that fourth, a new info the oldest info", async ({
   page,
 }) => {
   await submitAll(page, [
@@ -278,9 +233,7 @@ test("a new info removes that fourth and then the oldest info", async ({
   ]);
 });
 
-test("a stop stays beside the working view of the next request", async ({
-  page,
-}) => {
+test("a held text starts a request that removes the stop", async ({ page }) => {
   const routes = await holdRounds(page);
   await openPage(page);
   await submit(page, "a");
@@ -290,7 +243,9 @@ test("a stop stays beside the working view of the next request", async ({
     json: { requestId: "r1", reply: { type: "stop", text: "No." } },
   });
   await expect(page.locator('[part~="indicator"]')).toBeVisible();
-  await expect(page.locator(`${notice} .text`)).toHaveText("No.");
+  await expect(page.locator(notice)).toHaveCount(0);
+  // It is still announced.
+  await expect(page.locator('[role="status"]')).toContainText("No.");
 });
 
 test("an HTTP error shows the error view and logs the cause", async ({
@@ -498,26 +453,6 @@ test("Close removes a notice at once", async ({ page }) => {
   await openPage(page);
   await submit(page, "a");
   await page.locator(notice).getByRole("button", { name: "Close" }).click();
-  await expect(page.locator(notice)).toHaveCount(0);
-});
-
-test("the pointer pauses a notice's time, which goes on after", async ({
-  page,
-}) => {
-  await page.clock.install();
-  await reply(page, { type: "stop", text: "No." });
-  await openPage(page, '<dicta-action notice-duration="4"></dicta-action>');
-  await submit(page, "a");
-  await expect(page.locator(notice)).toBeVisible();
-  await page.clock.runFor(1000);
-  await page.locator(notice).hover();
-  await page.clock.runFor(10_000);
-  await expect(page.locator(notice)).toBeVisible();
-  await page.mouse.move(0, 0);
-  // About 3 of its 4 seconds are left, not all 4.
-  await page.clock.runFor(2800);
-  await expect(page.locator(notice)).toBeVisible();
-  await page.clock.runFor(400);
   await expect(page.locator(notice)).toHaveCount(0);
 });
 
