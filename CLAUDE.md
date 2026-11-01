@@ -6,6 +6,8 @@ application in their own words, through AI. This library sends the request to
 functions and the user's rights. The text can come from any source, for example
 dicta-js. The details are in `specs/`.
 
+Accessibility, high test coverage, security and stability are first-class goals.
+
 ## Specs and tasks
 
 - `specs/` is authoritative; code follows it. Specs are living documents: write
