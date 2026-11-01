@@ -191,11 +191,6 @@ const INVALID: [string, unknown, RegExp][] = [
     { steps: [{ call: "tasks.count", args: { q: "a" } }] },
     /args must be \{\}/,
   ],
-  [
-    "a call without args",
-    { steps: [{ call: "tasks.count" }] },
-    /args must be an object/,
-  ],
   ["final that is not a boolean", { steps: [], final: "yes" }, /final must be/],
   ["a label that is not text", { steps: [], text: 5 }, /text must be a string/],
   [

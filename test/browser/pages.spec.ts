@@ -322,6 +322,40 @@ test("after Stay at the leave prompt text is ignored until Cancel", async ({
   });
 });
 
+test("Cancel after Stay keeps the text added before the page load", async ({
+  page,
+}) => {
+  const plan = { steps: [{ call: "page.reloadLater", args: {} }, list] };
+  const bodies = await replies(page, { type: "plan", plan });
+  await openApp(page);
+  // The leave prompt needs a click on the page first; Stay dismisses it.
+  await page.evaluate(() =>
+    addEventListener("beforeunload", (event) => event.preventDefault()),
+  );
+  await page.mouse.click(1, 1);
+  page.on("dialog", (dialog) => void dialog.dismiss());
+  await submit(page, "go");
+  await page.waitForFunction(() => "release" in window);
+  // Added while the step runs, before its page load starts.
+  await submit(page, "and more");
+  await page.evaluate(() =>
+    (window as unknown as { release: () => void }).release(),
+  );
+  await expect(page.locator('[part~="label"]')).toHaveText(
+    "Wait for the page to load",
+  );
+  await page.getByRole("button", { name: "Cancel" }).click();
+  await expect(page.locator('[part~="view"]')).toBeHidden();
+  expect(bodies.length).toBe(1);
+  expect((await history(page))[0]).toMatchObject({
+    outcome: { type: "cancelled" },
+    exchange: [
+      { plan, report: { halt: { step: 2, ...navigated } } },
+      { added: "and more" },
+    ],
+  });
+});
+
 test("a hash change does not stop the plan", async ({ page }) => {
   const plan = {
     steps: [

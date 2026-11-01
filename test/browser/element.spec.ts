@@ -1,5 +1,14 @@
 import { expect, type Page, test } from "@playwright/test";
-import { holdRounds, openPage, replies, reply, ROUND, submit } from "./page.ts";
+import {
+  ANNOUNCE_DELAY_MS,
+  holdRounds,
+  openPage,
+  pauseClock,
+  replies,
+  reply,
+  ROUND,
+  submit,
+} from "./page.ts";
 
 const view = '[part~="view"]';
 const notice = '[part~="notice"]';
@@ -80,6 +89,8 @@ test("Cancel ends the request and a late response is ignored", async ({
   });
   await page.waitForTimeout(200);
   await expect(page.locator(view)).toBeHidden();
+  // A response that is not ignored would show its stop as a notice.
+  await expect(page.locator(notice)).toHaveCount(0);
 });
 
 test("a done with a text is a notice that stays", async ({ page }) => {
@@ -129,11 +140,13 @@ test("an info keeps its paragraphs and stays until Close", async ({ page }) => {
   await page.clock.install();
   await reply(page, { type: "info", text: "First.\n\nSecond." });
   await openPage(page);
+  await pauseClock(page);
   await submit(page, "a");
   const text = page.locator(`${notice} .text`);
   await expect(text).toHaveText("First.\n\nSecond.", { useInnerText: true });
   await expect(text).toHaveCSS("white-space", "pre-line");
   // Only the info string is announced, not the text.
+  await page.clock.runFor(ANNOUNCE_DELAY_MS);
   await expect(page.locator(status)).toHaveText("Working New information");
   await page.clock.runFor(60_000);
   await expect(page.locator(notice)).toBeVisible();
@@ -311,16 +324,24 @@ test("the indicator stands still with reduced motion", async ({ page }) => {
 });
 
 test("the status region announces the outcome", async ({ page }) => {
+  await page.clock.install();
   await reply(page, { type: "stop", text: "Not about this site." });
   await openPage(page);
+  await pauseClock(page);
   await submit(page, "a");
+  await expect(page.locator(notice)).toBeVisible();
+  await page.clock.runFor(ANNOUNCE_DELAY_MS);
   await expect(page.locator(status)).toHaveText("Working Not about this site.");
 });
 
 test("the status region announces a notice", async ({ page }) => {
+  await page.clock.install();
   await reply(page, { type: "done", text: "Moved 2 tasks." });
   await openPage(page);
+  await pauseClock(page);
   await submit(page, "a");
+  await expect(page.locator(notice)).toBeVisible();
+  await page.clock.runFor(ANNOUNCE_DELAY_MS);
   await expect(page.locator(status)).toHaveText("Working Moved 2 tasks.");
 });
 
@@ -393,16 +414,21 @@ test("the focus goes to the element when the text field is gone", async ({
 });
 
 test("a view that goes away without the focus leaves it", async ({ page }) => {
-  await holdRounds(page);
+  const routes = await holdRounds(page);
   await openPage(
     page,
     "<input><button>Other</button><dicta-action></dicta-action>",
   );
   await page.locator("input").focus();
   await submit(page, "a");
-  await page.keyboard.press("Tab");
+  await expect(page.locator(view)).toBeVisible();
   await page.getByRole("button", { name: "Other" }).focus();
-  await page.getByRole("button", { name: "Cancel" }).click();
+  // The request ends by itself, so the focus is never in the view.
+  await expect.poll(() => routes.length).toBe(1);
+  await routes[0].fulfill({
+    json: { requestId: "r1", reply: { type: "stop", text: "No." } },
+  });
+  await expect(page.locator(view)).toBeHidden();
   await expect(page.getByRole("button", { name: "Other" })).toBeFocused();
 });
 

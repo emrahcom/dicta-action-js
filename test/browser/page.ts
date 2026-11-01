@@ -80,6 +80,16 @@ export async function reply(page: Page, reply: unknown) {
   );
 }
 
+// The element's wait before it sets the status region (element.ts).
+export const ANNOUNCE_DELAY_MS = 100;
+
+// Stops the page's clock, installed before the page loaded, so the test moves
+// it on itself, for example past the announce delay: texts announced before
+// that are then always set together, however slow the reply is.
+export async function pauseClock(page: Page) {
+  await page.clock.pauseAt(Date.now() + 1000);
+}
+
 // Holds every round until the test answers it.
 export async function holdRounds(page: Page) {
   const routes: Route[] = [];

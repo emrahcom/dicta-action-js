@@ -1,5 +1,12 @@
 import { expect, test } from "@playwright/test";
-import { holdRounds, openPage, replies, submit } from "./page.ts";
+import {
+  ANNOUNCE_DELAY_MS,
+  holdRounds,
+  openPage,
+  pauseClock,
+  replies,
+  submit,
+} from "./page.ts";
 
 const question = {
   type: "question",
@@ -16,8 +23,10 @@ function inState(page: import("@playwright/test").Page, state: string) {
 }
 
 test("a question shows its text, its options and Cancel", async ({ page }) => {
+  await page.clock.install();
   await replies(page, question);
   await openPage(page);
+  await pauseClock(page);
   await submit(page, "move the tasks");
   await expect(page.locator('[part~="text"]')).toHaveText("Which Friday?");
   await expect(page.locator('[part~="option"]')).toHaveText([
@@ -27,6 +36,7 @@ test("a question shows its text, its options and Cancel", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Cancel" })).toBeVisible();
   expect(await inState(page, "question")).toBe(true);
   // The options are announced after the question's text.
+  await page.clock.runFor(ANNOUNCE_DELAY_MS);
   await expect(page.locator('[role="status"]')).toHaveText(
     "Working Which Friday? This week Next week",
   );

@@ -1,5 +1,13 @@
 import { expect, type Page, test } from "@playwright/test";
-import { deleted, holdStep, openPage, replies, submit } from "./page.ts";
+import {
+  ANNOUNCE_DELAY_MS,
+  deleted,
+  holdStep,
+  openPage,
+  pauseClock,
+  replies,
+  submit,
+} from "./page.ts";
 
 const done = { type: "done" };
 const text = '[part~="text"]';
@@ -22,8 +30,10 @@ const deleteOne = {
 };
 
 test("a destructive step shows the confirmation view", async ({ page }) => {
+  await page.clock.install();
   await replies(page, deleteOne, done);
   await openPage(page);
+  await pauseClock(page);
   await submit(page, "delete it");
   await expect(page.locator(text)).toHaveText("Delete task t1");
   await expect(page.getByRole("button", { name: "Continue" })).toBeVisible();
@@ -31,6 +41,7 @@ test("a destructive step shows the confirmation view", async ({ page }) => {
   // The confirmation shows only the module's words, not the plan's label.
   await expect(page.locator('[part~="label"]')).toHaveCount(0);
   expect(await inState(page, "confirmation")).toBe(true);
+  await page.clock.runFor(ANNOUNCE_DELAY_MS);
   await expect(page.locator('[role="status"]')).toHaveText(
     "Working Deleting the task Delete task t1",
   );

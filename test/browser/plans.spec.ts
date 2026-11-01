@@ -1,5 +1,12 @@
 import { expect, test } from "@playwright/test";
-import { openPage, replies, ROUND, submit } from "./page.ts";
+import {
+  ANNOUNCE_DELAY_MS,
+  openPage,
+  pauseClock,
+  replies,
+  ROUND,
+  submit,
+} from "./page.ts";
 
 const done = { type: "done" };
 
@@ -86,7 +93,9 @@ test("the working view shows and announces the plan's label", async ({
       });
     }
   });
+  await page.clock.install();
   await openPage(page);
+  await pauseClock(page);
   // Holds the plan's only step until the test has seen the label.
   await page.evaluate(() => {
     const element = document.querySelector("dicta-action") as unknown as {
@@ -100,6 +109,7 @@ test("the working view shows and announces the plan's label", async ({
   });
   await submit(page, "a");
   await expect(page.locator('[part~="label"]')).toHaveText("Listing the tasks");
+  await page.clock.runFor(ANNOUNCE_DELAY_MS);
   await expect(page.locator('[role="status"]')).toHaveText(
     "Working Listing the tasks",
   );
