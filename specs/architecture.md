@@ -217,10 +217,12 @@ looks again when the page is shown from the back/forward cache (`pageshow`).
 
 ## Built-in capabilities
 
-`dictaCapabilities` holds `dicta.listHistory` and `dicta.getHistory`
-(`contract-capability.md`, Built-in capabilities), with `args` and `output`
-schemas. They read `dicta-action-history` from session storage themselves, so
-they do not depend on the `<dicta-action>` element.
+`dictaCapabilities` holds the built-in capabilities (`contract-capability.md`,
+Built-in capabilities).
+
+The history capabilities, `dicta.listHistory` and `dicta.getHistory`, read
+`dicta-action-history` from session storage themselves, so they do not depend on
+the `<dicta-action>` element.
 
 ## Strings
 
