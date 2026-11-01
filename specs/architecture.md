@@ -192,8 +192,8 @@ The runner follows `contract-plan.md` and builds the report of
 - Page loads (`contract-protocol.md`, Page changes):
   - A page load is a `navigate` event of the Navigation API for another document
     (`destination.sameDocument` is false).
-  - The runner checks for one after each step, and in a `forEach` after each
-    call.
+  - Only a capability with `pageLoad` is checked: the runner looks for one after
+    each call of such a capability, and ignores one at any other time.
   - It checks at once. Only when it sees none, it checks once more one task
     later, since WebKit fires the event late for `location.reload()`. It never
     waits after a seen page load: the new page could come first and end the
