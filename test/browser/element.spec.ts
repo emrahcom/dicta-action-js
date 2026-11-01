@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 import { holdRounds, openPage, replies, reply, ROUND, submit } from "./page.ts";
 
 const view = '[part~="view"]';
@@ -210,6 +210,71 @@ test("at most three notices, never dropping an info", async ({ page }) => {
     "Help.",
     "Two.",
     "Three.",
+  ]);
+});
+
+// Answers rounds in order and waits after each request until it is over.
+async function submitAll(page: Page, list: unknown[]) {
+  await replies(page, ...list);
+  await openPage(page);
+  for (const [i] of list.entries()) {
+    await submit(page, `r${i}`);
+    await expect(page.locator('[part~="indicator"]')).toHaveCount(0);
+  }
+}
+
+test("with three infos, a new info removes the oldest", async ({ page }) => {
+  await submitAll(page, [
+    { type: "info", text: "One." },
+    { type: "info", text: "Two." },
+    { type: "info", text: "Three." },
+    { type: "info", text: "Four." },
+  ]);
+  await expect(page.locator(`${notice} .text`)).toHaveText([
+    "Two.",
+    "Three.",
+    "Four.",
+  ]);
+});
+
+test("with three infos, a stop is shown as a fourth until it goes", async ({
+  page,
+}) => {
+  await page.clock.install();
+  await submitAll(page, [
+    { type: "info", text: "One." },
+    { type: "info", text: "Two." },
+    { type: "info", text: "Three." },
+    { type: "stop", text: "No." },
+  ]);
+  await expect(page.locator(`${notice} .text`)).toHaveText([
+    "One.",
+    "Two.",
+    "Three.",
+    "No.",
+  ]);
+  await page.clock.runFor(60_000);
+  await expect(page.locator(`${notice} .text`)).toHaveText([
+    "One.",
+    "Two.",
+    "Three.",
+  ]);
+});
+
+test("a new info removes that fourth and then the oldest info", async ({
+  page,
+}) => {
+  await submitAll(page, [
+    { type: "info", text: "One." },
+    { type: "info", text: "Two." },
+    { type: "info", text: "Three." },
+    { type: "stop", text: "No." },
+    { type: "info", text: "Four." },
+  ]);
+  await expect(page.locator(`${notice} .text`)).toHaveText([
+    "Two.",
+    "Three.",
+    "Four.",
   ]);
 });
 

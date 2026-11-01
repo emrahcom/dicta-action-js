@@ -813,12 +813,16 @@ export class DictaAction extends HTMLElement {
       this.#timeNotice(notice, text);
       this.#announce(text);
     }
+    // The oldest that goes away by itself goes first; only an info removes an
+    // info, so with three infos another notice is shown as a fourth.
     const shown = Array.from(this.#notices.children) as HTMLElement[];
-    if (shown.length >= MAX_NOTICES) {
-      const oldest = shown.find((element) => !this.#infos.has(element));
-      if (oldest) {
-        this.#removeNotice(oldest);
+    while (shown.length >= MAX_NOTICES) {
+      const index = shown.findIndex((element) => !this.#infos.has(element));
+      const oldest = index >= 0 ? index : info ? 0 : -1;
+      if (oldest < 0) {
+        break;
       }
+      this.#removeNotice(shown.splice(oldest, 1)[0]);
     }
     this.#notices.append(notice);
   }
