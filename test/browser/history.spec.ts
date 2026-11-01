@@ -43,9 +43,9 @@ test("stops and infos are stored newest first", async ({ page }) => {
   );
   await openPage(page);
   await submit(page, "a");
-  await expect(page.locator('[part~="notice"]').last()).toHaveText("No.");
+  await expect(page.locator('[part~="notice"] .text').last()).toHaveText("No.");
   await submit(page, "b");
-  await expect(page.locator('[part~="notice"]').last()).toContainText(
+  await expect(page.locator('[part~="notice"] .text').last()).toContainText(
     "Like this.",
   );
   await submit(page, "c");
@@ -71,7 +71,7 @@ test("an error in a later round is stored", async ({ page }) => {
   await submit(page, "a");
   await expect(page.locator('[part~="text"]')).toHaveText("When?");
   await submit(page, "now");
-  await expect(page.locator('[part~="notice"]')).toHaveText(
+  await expect(page.locator('[part~="notice"] .text')).toHaveText(
     "Something went wrong",
   );
   const [entry] = await history(page);
@@ -87,7 +87,7 @@ test("a request without a requestId is not stored", async ({ page }) => {
   );
   await openPage(page);
   await submit(page, "a");
-  await expect(page.locator('[part~="notice"]')).toHaveText(
+  await expect(page.locator('[part~="notice"] .text')).toHaveText(
     "Something went wrong",
   );
   const routes = await holdRounds(page);

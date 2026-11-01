@@ -120,7 +120,7 @@ test("text over 10000 characters is not taken", async ({ page }) => {
   const bodies = await replies(page, done);
   await openPage(page);
   await submit(page, "a".repeat(10001));
-  await expect(page.locator('[part~="notice"]')).toHaveText(
+  await expect(page.locator('[part~="notice"] .text')).toHaveText(
     "The text is too long",
   );
   await page.waitForTimeout(200);
@@ -135,7 +135,7 @@ test("a too long answer leaves the question open", async ({ page }) => {
   await submit(page, "move the tasks");
   await expect(page.locator('[part~="text"]')).toHaveText("When?");
   await submit(page, "a".repeat(10001));
-  await expect(page.locator('[part~="notice"]')).toHaveText(
+  await expect(page.locator('[part~="notice"] .text')).toHaveText(
     "The text is too long",
   );
   await expect(page.locator('[part~="text"]')).toHaveText("When?");

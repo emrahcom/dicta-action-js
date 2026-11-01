@@ -189,7 +189,7 @@ test("a failed round while leaving is an error when the page stays", async ({
   // A page load that starts and is called off, as by a "leave page?" prompt.
   await page.evaluate(() => dispatchEvent(new Event("beforeunload")));
   await submit(page, "a");
-  await expect(page.locator('[part~="notice"]')).toHaveText(
+  await expect(page.locator('[part~="notice"] .text')).toHaveText(
     "Something went wrong",
   );
 });

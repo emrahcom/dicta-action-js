@@ -122,7 +122,9 @@ test("a request goes through a plan, a question and done", async ({ page }) => {
   await openPage(page);
   await submit(page, "open a task");
   await page.getByRole("button", { name: "Budget" }).click();
-  await expect(page.locator('[part~="notice"]')).toHaveText("Opened Budget.");
+  await expect(page.locator('[part~="notice"] .text')).toHaveText(
+    "Opened Budget.",
+  );
   expect(bodies[2].exchange).toEqual([
     { plan, report: {} },
     { question: "Which one?", answer: "Budget" },

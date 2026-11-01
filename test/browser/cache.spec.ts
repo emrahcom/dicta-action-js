@@ -42,7 +42,7 @@ test("after pagehide a failed round is an error at once", async ({ page }) => {
   await fire(page, "pagehide");
   await submit(page, "a");
   // Well under the one second a leaving page waits.
-  await expect(page.locator('[part~="notice"]')).toHaveText(
+  await expect(page.locator('[part~="notice"] .text')).toHaveText(
     "Something went wrong",
     { timeout: 500 },
   );

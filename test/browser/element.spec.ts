@@ -87,7 +87,7 @@ test("a done with a text is a notice that goes away", async ({ page }) => {
   await reply(page, { type: "done", text: "Moved 2 tasks." });
   await openPage(page, '<dicta-action notice-duration="2"></dicta-action>');
   await submit(page, "a");
-  await expect(page.locator(notice)).toHaveText("Moved 2 tasks.");
+  await expect(page.locator(`${notice} .text`)).toHaveText("Moved 2 tasks.");
   await expect(page.locator(view)).toBeHidden();
   await page.clock.runFor(1900);
   await expect(page.locator(notice)).toBeVisible();
@@ -148,7 +148,9 @@ test("a stop is a notice that goes away", async ({ page }) => {
   await reply(page, { type: "stop", text: "Not about this site." });
   await openPage(page, '<dicta-action notice-duration="1"></dicta-action>');
   await submit(page, "a");
-  await expect(page.locator(notice)).toHaveText("Not about this site.");
+  await expect(page.locator(`${notice} .text`)).toHaveText(
+    "Not about this site.",
+  );
   await expect(page.locator(view)).toBeHidden();
   await page.clock.runFor(1100);
   await expect(page.locator(notice)).toHaveCount(0);
@@ -188,7 +190,7 @@ test("texts are shown as plain text", async ({ page }) => {
   await reply(page, { type: "stop", text: "<b>bold</b>" });
   await openPage(page);
   await submit(page, "a");
-  await expect(page.locator(notice)).toHaveText("<b>bold</b>");
+  await expect(page.locator(`${notice} .text`)).toHaveText("<b>bold</b>");
 });
 
 test("at most three notices, never dropping an info", async ({ page }) => {
@@ -204,8 +206,8 @@ test("at most three notices, never dropping an info", async ({ page }) => {
     await submit(page, text);
     await expect(page.locator('[part~="indicator"]')).toHaveCount(0);
   }
-  await expect(page.locator(notice)).toHaveText([
-    "Help.Close",
+  await expect(page.locator(`${notice} .text`)).toHaveText([
+    "Help.",
     "Two.",
     "Three.",
   ]);
@@ -223,7 +225,7 @@ test("a stop stays beside the working view of the next request", async ({
     json: { requestId: "r1", reply: { type: "stop", text: "No." } },
   });
   await expect(page.locator('[part~="indicator"]')).toBeVisible();
-  await expect(page.locator(notice)).toHaveText("No.");
+  await expect(page.locator(`${notice} .text`)).toHaveText("No.");
 });
 
 test("an HTTP error shows the error view and logs the cause", async ({
@@ -236,7 +238,9 @@ test("an HTTP error shows the error view and logs the cause", async ({
   );
   await openPage(page);
   await submit(page, "a");
-  await expect(page.locator(notice)).toHaveText("Something went wrong");
+  await expect(page.locator(`${notice} .text`)).toHaveText(
+    "Something went wrong",
+  );
   await expect(page.locator(view)).toBeHidden();
   expect(logs.some((log) => log.includes("HTTP 400: context: too large"))).toBe(
     true,
@@ -244,15 +248,7 @@ test("an HTTP error shows the error view and logs the cause", async ({
 });
 
 test("strings override the element's own texts", async ({ page }) => {
-  let rounds = 0;
-  await page.route(ROUND, (route) => {
-    rounds += 1;
-    return rounds === 1
-      ? route.fulfill({ status: 500, json: {} })
-      : route.fulfill({
-          json: { requestId: "r1", reply: { type: "info", text: "Hilfe." } },
-        });
-  });
+  await page.route(ROUND, (route) => route.fulfill({ status: 500, json: {} }));
   await openPage(page);
   await page.evaluate(() =>
     Object.assign(document.querySelector("dicta-action")!, {
@@ -265,8 +261,7 @@ test("strings override the element's own texts", async ({ page }) => {
     }),
   );
   await submit(page, "a");
-  await expect(page.locator(notice)).toHaveText("Fehler");
-  await submit(page, "b");
+  await expect(page.locator(`${notice} .text`)).toHaveText("Fehler");
   await expect(page.getByRole("button", { name: "Schliessen" })).toBeVisible();
 });
 
@@ -429,4 +424,49 @@ test("getToken set before the element is defined, and set again", async ({
   );
   await submit(page, "b");
   await expect.poll(() => headers).toEqual(["Bearer first", "Bearer second"]);
+});
+
+// Close and the paused time of a notice (Display).
+
+test("Close removes a notice at once", async ({ page }) => {
+  await reply(page, { type: "stop", text: "No." });
+  await openPage(page);
+  await submit(page, "a");
+  await page.locator(notice).getByRole("button", { name: "Close" }).click();
+  await expect(page.locator(notice)).toHaveCount(0);
+});
+
+test("the pointer pauses a notice's time, which goes on after", async ({
+  page,
+}) => {
+  await page.clock.install();
+  await reply(page, { type: "stop", text: "No." });
+  await openPage(page, '<dicta-action notice-duration="4"></dicta-action>');
+  await submit(page, "a");
+  await expect(page.locator(notice)).toBeVisible();
+  await page.clock.runFor(1000);
+  await page.locator(notice).hover();
+  await page.clock.runFor(10_000);
+  await expect(page.locator(notice)).toBeVisible();
+  await page.mouse.move(0, 0);
+  // About 3 of its 4 seconds are left, not all 4.
+  await page.clock.runFor(2800);
+  await expect(page.locator(notice)).toBeVisible();
+  await page.clock.runFor(400);
+  await expect(page.locator(notice)).toHaveCount(0);
+});
+
+test("Close on a stop notice gives the focus back to the text field", async ({
+  page,
+}) => {
+  await reply(page, { type: "stop", text: "No." });
+  await openPage(page, "<input><dicta-action></dicta-action>");
+  await page.locator("input").focus();
+  await submit(page, "a");
+  await expect(page.locator(notice)).toBeVisible();
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("button", { name: "Close" })).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.locator("input")).toBeFocused();
 });

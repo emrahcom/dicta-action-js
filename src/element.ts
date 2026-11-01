@@ -794,19 +794,19 @@ export class DictaAction extends HTMLElement {
     notice.className = "notice";
     notice.part.add("notice");
     notice.tabIndex = 0;
+    const element = document.createElement("div");
+    element.className = "text";
+    element.textContent = text;
+    // Every notice can be closed at once.
+    notice.append(
+      element,
+      this.#button("close", () => this.#removeNotice(notice)),
+    );
     if (info) {
-      const element = document.createElement("div");
-      element.className = "text";
-      element.textContent = text;
-      notice.append(
-        element,
-        this.#button("close", () => this.#removeNotice(notice)),
-      );
       this.#infos.add(notice);
       // An info can be long: only the info string is announced.
       this.#announce(this.#string("info"));
     } else {
-      notice.textContent = text;
       this.#timeNotice(notice, text);
       this.#announce(text);
     }
@@ -821,39 +821,47 @@ export class DictaAction extends HTMLElement {
   }
 
   // A notice that goes away by itself: after notice-duration or its reading
-  // time, whichever is longer. While the pointer is over it or it has focus,
-  // it stays, and the time starts again when they leave.
+  // time, whichever is longer. While the pointer is over it or the focus is in
+  // it, its time stops, and it goes on when they leave.
   #timeNotice(notice: HTMLElement, text: string) {
     const words = text.split(/\s+/).filter(Boolean).length;
-    const ms =
+    let left =
       Math.max(this.#noticeSeconds(), Math.ceil(words / WORDS_PER_SECOND)) *
       1000;
+    let since = 0;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let hovered = false;
     let focused = false;
-    const start = () => {
-      clearTimeout(timer);
-      if (!hovered && !focused) {
-        timer = setTimeout(() => this.#removeNotice(notice), ms);
+    const update = () => {
+      if (hovered || focused) {
+        if (timer !== undefined) {
+          clearTimeout(timer);
+          timer = undefined;
+          left -= Date.now() - since;
+        }
+      } else if (timer === undefined) {
+        since = Date.now();
+        timer = setTimeout(() => this.#removeNotice(notice), left);
       }
     };
     notice.addEventListener("pointerenter", () => {
       hovered = true;
-      start();
+      update();
     });
     notice.addEventListener("pointerleave", () => {
       hovered = false;
-      start();
+      update();
     });
-    notice.addEventListener("focus", () => {
+    // focusin and focusout, so the focus on its Close counts too.
+    notice.addEventListener("focusin", () => {
       focused = true;
-      start();
+      update();
     });
-    notice.addEventListener("blur", () => {
+    notice.addEventListener("focusout", () => {
       focused = false;
-      start();
+      update();
     });
-    start();
+    update();
   }
 
   // Removes a notice. When the focus was in it, it goes back (#returnFocus).
