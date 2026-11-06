@@ -6,7 +6,8 @@ export type Level = "read" | "write" | "destructive" | "external";
 // The JSON Schema keywords a capability may use (contract-capability.md,
 // Capabilities).
 export type Schema = {
-  type?: string;
+  // One type, or a list of types any of which a value may have.
+  type?: string | string[];
   properties?: Record<string, Schema>;
   required?: string[];
   items?: Schema;

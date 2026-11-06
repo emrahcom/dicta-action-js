@@ -174,6 +174,35 @@ test("a $$ string passes an enum of its single-$ value", async () => {
   assert.deepEqual(calls[0], ["prices.set", { currency: "$USD" }]);
 });
 
+test("a reference filled in with null passes a type list", async () => {
+  const using = moduleWith({
+    "tasks.get": {
+      level: "read",
+      desc: "Gets a task.",
+      run: recorder("tasks.get", () => ({ id: "t1", due: null })),
+    },
+    "tasks.plan": {
+      level: "read",
+      desc: "Plans a task.",
+      args: {
+        type: "object",
+        properties: { due: { type: ["string", "null"] } },
+      },
+      run: recorder("tasks.plan", () => null),
+    },
+  });
+  const plan = {
+    steps: [
+      { call: "tasks.get", args: {} },
+      { call: "tasks.plan", args: { due: "$1.due" } },
+    ],
+  };
+  checkPlan(plan, buildContext(using));
+  const report = await run(plan, using);
+  assert.deepEqual(report, {});
+  assert.deepEqual(calls[1], ["tasks.plan", { due: null }]);
+});
+
 test("a filled-in value is checked again", async () => {
   const report = await run({
     steps: [list, { call: "tasks.count", args: { n: "$1.0.id" } }],

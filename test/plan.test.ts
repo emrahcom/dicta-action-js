@@ -28,6 +28,7 @@ const CONTEXT: SiteContext = {
           title: { type: "string" },
           priority: { type: "integer" },
           tags: { type: "array", items: { type: "string" } },
+          due: { type: ["string", "null"] },
           color: { enum: ["red", "green", "$red", "$$green"] },
         },
         required: ["title"],
@@ -71,6 +72,14 @@ const create = (args: unknown) => ({ call: "tasks.create", args });
 const move = (args: unknown) => ({ call: "tasks.move", args });
 
 const VALID: [string, unknown][] = [
+  [
+    "an argument that matches the first type of a list",
+    { steps: [create({ title: "a", due: "2026-11-06" })] },
+  ],
+  [
+    "an argument that matches the second type of a list",
+    { steps: [create({ title: "a", due: null })] },
+  ],
   ["an empty plan", { steps: [] }],
   ["a final plan", { steps: [list], final: true }],
   ["a plan with a label", { steps: [list], text: "Listing the tasks" }],
@@ -260,6 +269,16 @@ const INVALID: [string, unknown, RegExp][] = [
     "an argument of the wrong type",
     { steps: [create({ title: 5 })] },
     /args\.title must be of type string/,
+  ],
+  [
+    "an argument that matches no type of a list",
+    { steps: [create({ title: "a", due: 5 })] },
+    /steps\[0\]\.args\.due must be of type string or null$/,
+  ],
+  [
+    "null for an argument whose type is only string",
+    { steps: [create({ title: null })] },
+    /args\.title must be of type string$/,
   ],
   [
     "an integer that is not whole",
