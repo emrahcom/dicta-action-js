@@ -1,6 +1,6 @@
 {
   "name": "dicta-action-js",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Browser element that runs a user request on your web site. It asks dicta-action-server for a plan and runs it with the functions of your site.",
   "keywords": [
     "natural-language",
