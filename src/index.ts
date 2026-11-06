@@ -7,5 +7,6 @@ if (!customElements.get("dicta-action")) {
 }
 
 export { dictaCapabilities } from "./builtins.ts";
+export { buildContext, type SiteContext } from "./context.ts";
 export { DictaAction };
 export type { Capability, CapabilityModule, Level, Schema } from "./module.ts";
