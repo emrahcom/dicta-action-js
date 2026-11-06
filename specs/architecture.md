@@ -148,7 +148,8 @@ request (`contract-protocol.md`, Added text and cancel).
 
 When a request ends, the view goes away and the outcome is a notice:
 
-- a stop, an error or a done with a text: the text;
+- a stop or a done with a text: the text;
+- an error: the `errorNotice` text (Strings);
 - an info: the text, in its paragraphs (`contract-protocol.md`, Response body);
 - a done without a text shows nothing.
 
