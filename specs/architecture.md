@@ -26,6 +26,9 @@ names them without the repo.
 - Published to npm as `dicta-action-js`, with the compiled JavaScript and its
   TypeScript type declarations. The capability module imports
   `dictaCapabilities` from it, so the site bundles both into its pages.
+- It also exports `buildContext`, which builds the site context from a
+  capability module (`contract-context.md`), the same function the element uses.
+  The harness check runs it outside a browser, with a DOM stand-in.
 - Importing the package defines `<dicta-action>`, a custom element, so it works
   in any page and with any UI framework. Its markup and styles live in a shadow
   root, so the page's styles do not break it.
