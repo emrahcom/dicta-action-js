@@ -95,9 +95,9 @@ The element runs one request at a time. `submit(text)`:
 - From the start of a page load during a request until the page is left: is
   ignored; the `working` view shows why (Display; `contract-protocol.md`, Page
   changes).
-- Text over 10000 characters (Unicode code points) is not taken: the element
-  shows the `tooLongNotice` text as a notice (Display) and nothing else changes
-  (`contract-protocol.md`, Limits).
+- Text over the limit of `text` (`contract-protocol.md`, Limits) is not taken:
+  the element shows the `tooLongNotice` text as a notice (Display) and nothing
+  else changes.
 
 The text becomes the request's `text`, a question's `answer` or an `added` item
 (`contract-protocol.md`, Request body).
@@ -117,7 +117,7 @@ the console, such as the server's `error`, for the site's developers.
 
 The element shows one view at a time, or none, and notices beside it. A view
 belongs to a running request: it shows where the request is and what the user
-can do with it. A notice tells something and does not.
+can do with it. A notice only tells something and belongs to no running request.
 
 While a request runs, from the submit on, each view has its own Cancel button,
 placed to fit the view:
@@ -197,9 +197,9 @@ The element keeps two entries in the tab's `sessionStorage`, as JSON:
   `navigated` at the first step that did not run or no halt, and the added text
   (`contract-protocol.md`, Page changes).
 - `dicta-action-history`: the finished requests, newest first, each with
-  `requestId`, `time`, `text`, `outcome` and `exchange`. At most 20 requests;
-  when storage is full, the oldest go first, also to make room for the saved
-  request.
+  `requestId`, `time`, `text`, `outcome` and `exchange`. As many as
+  `contract-capability.md`, History allows; when storage is full, the oldest go
+  first, also to make room for the saved request.
 
 When the element has its `server` and `module`, it looks for a saved request,
 takes it out and goes on or ends it (`contract-protocol.md`, Page changes). It
