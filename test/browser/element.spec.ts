@@ -490,7 +490,7 @@ test("Close on a stop notice gives the focus back to the text field", async ({
   await page.locator("input").focus();
   await submit(page, "a");
   await expect(page.locator(notice)).toBeVisible();
-  await page.keyboard.press("Tab");
+  // A stop's notice is no Tab stop: the next one is its Close.
   await page.keyboard.press("Tab");
   await expect(page.getByRole("button", { name: "Close" })).toBeFocused();
   await page.keyboard.press("Enter");

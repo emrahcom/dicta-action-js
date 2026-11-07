@@ -830,7 +830,10 @@ export class DictaAction extends HTMLElement {
     const notice = document.createElement("div");
     notice.className = "notice";
     notice.part.add("notice");
-    notice.tabIndex = 0;
+    // Only an info can take the focus, so the user moves to it to read it.
+    if (info) {
+      notice.tabIndex = 0;
+    }
     const element = document.createElement("div");
     element.className = "text";
     element.textContent = text;
