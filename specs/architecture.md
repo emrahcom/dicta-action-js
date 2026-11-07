@@ -91,9 +91,7 @@ The element runs one request at a time. `submit(text)`:
   (`contract-protocol.md`, Added text and cancel). The element shows the
   `useButtonsNotice` text as a notice (Display).
 - While the element waits for the server or runs a plan, before a page load
-  starts: is added text (`contract-protocol.md`, Added text and cancel). The
-  client takes all text that comes; background speech from an always-open
-  microphone is a known open point.
+  starts: is added text (`contract-protocol.md`, Added text and cancel).
 - From the start of a page load during a request until the page is left: is
   ignored; the `working` view shows why (Display; `contract-protocol.md`, Page
   changes).
@@ -105,8 +103,7 @@ The text becomes the request's `text`, a question's `answer` or an `added` item
 (`contract-protocol.md`, Request body).
 
 Before each round the element calls `module.state.run()` for `state` and takes
-`time` from the browser: local time to the second, with the offset as numbers,
-`+00:00` too, never `Z` (`contract-protocol.md`, Request body).
+`time` from the browser (`contract-protocol.md`, Request body).
 
 A round is `POST <server>/dicta-action/v1/round`. A `401` gets a new token and
 one more try with the same body. Every other HTTP error, a network failure, a
@@ -118,12 +115,9 @@ the console, such as the server's `error`, for the site's developers.
 
 ## Display
 
-The element shows little: the user wants the task done, not to read.
-
 The element shows one view at a time, or none, and notices beside it. A view
 belongs to a running request: it shows where the request is and what the user
-can do with it. A notice tells something and does not. The name of the view
-shown is also the element's custom state (Element), for styling.
+can do with it. A notice tells something and does not.
 
 While a request runs, from the submit on, each view has its own Cancel button,
 placed to fit the view:
@@ -137,11 +131,9 @@ placed to fit the view:
 - `question`: the question's text, its options as buttons and Cancel. Pressing
   an option answers with the option's text.
 - `confirmation`: only the texts from the module's `confirm` as plain text
-  (`contract-plan.md`, Confirmation), Continue and Cancel. For a `forEach`, the
-  first three items, and the number of items (the `items` string) when there are
-  more than three. For many top-level steps of one write capability, the text of
-  the first and the number of these steps (the `items` string)
-  (`contract-plan.md`, Confirmation).
+  (`contract-plan.md`, Confirmation), Continue and Cancel. The items and counts
+  come from `contract-plan.md`, Confirmation; a count is shown with the `items`
+  string.
 
 An answer or Continue brings back `working`. Cancel in any view cancels the
 request (`contract-protocol.md`, Added text and cancel).
@@ -152,8 +144,6 @@ When a request ends, the view goes away and the outcome is a notice:
 - an error: the `errorNotice` text (Strings);
 - an info: the text, in its paragraphs (`contract-protocol.md`, Response body);
 - a done without a text shows nothing.
-
-The `tooLongNotice` and `useButtonsNotice` texts are notices too.
 
 An info stays until the user closes it. Any other notice stays until the user
 closes it or a new request starts. Every notice has a Close button.
@@ -195,8 +185,7 @@ The runner follows `contract-plan.md` and builds the report of
     request.
   - When it sees one, it stops, and the element waits for the page to be left.
   - Without the Navigation API, page loads are not seen and the runner goes on.
-- Error messages are cut to 200 characters. Included outputs are counted as the
-  UTF-8 bytes of their JSON, at most 16 KB together.
+- Messages and included outputs follow `contract-protocol.md`, Limits.
 
 ## Storage
 
@@ -280,6 +269,5 @@ The element meets WCAG 2.2 level AA.
 - A screen reader user hears every request from start to end, also where the
   screen shows little: the `working` string when a request starts or goes on in
   a new page, the plan's label when it has one, and the `done` string for a done
-  without a text. The `working`, `done` and `info` strings are announced only,
-  never shown.
+  without a text.
 - All text and buttons have enough contrast.

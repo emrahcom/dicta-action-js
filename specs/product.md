@@ -42,17 +42,11 @@ calling the site's capability functions, with the user's own rights.
 - Text the application passes while a request runs is added text: it interrupts
   the plan, and the server decides what comes next (`contract-protocol.md` in
   `dicta-action-server`, Added text and cancel).
-- Before a risky step, the user presses Continue or Cancel: a destructive or
-  external step, a `forEach` with a write call and more items than the module's
-  `confirmOver`, or the first of more than `confirmOver` top-level steps that
-  call one write capability (`contract-plan.md` in `dicta-action-server`,
-  Confirmation).
+- Before a risky step, the user presses Continue or Cancel (`contract-plan.md`
+  in `dicta-action-server`, Confirmation).
 - A question from the server is shown with its options as buttons. While a
   question is open, the next text the application passes is the answer.
-- Everything shown is short: the user wants the task done, not to read. Only an
-  info, the answer to a question about the site, is longer; it stays until the
-  user closes it. The outcome of a request is a notice. Every other notice stays
-  until the user closes it or a new request starts.
+- Everything shown is short: the user wants the task done, not to read.
 - A request goes on on the new page when a step changes the page, and ends when
   the page changes at any other time (`contract-protocol.md` in
   `dicta-action-server`, Page changes).
