@@ -55,11 +55,11 @@ action.submit("plan the lemon cake for Friday");
 
 ## Documents
 
-- Writing a capability module and adding dicta to your site:
+- Writing a capability module and adding dicta to your site:\
   https://github.com/emrahcom/dicta-action-harness
-- The server and the formats of the module and the plan:
+- The server and the formats of the module and the plan:\
   https://github.com/emrahcom/dicta-action-server
-- How this library works:
+- How this library works:\
   https://github.com/emrahcom/dicta-action-js/tree/main/specs
 
 ## License
