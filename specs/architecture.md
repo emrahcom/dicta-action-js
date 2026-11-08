@@ -30,9 +30,9 @@ names them without the repo.
 - Published to npm as `dicta-action-js`, with the compiled JavaScript and its
   TypeScript type declarations. The capability module imports
   `dictaCapabilities` from it, so the site bundles both into its pages.
-- It also exports `buildContext`, which builds the site context from a
-  capability module (`contract-context.md`), the same function the element uses.
-  The harness check runs it outside a browser, with a DOM stand-in.
+- It also exports `buildContext`, which the element uses to turn a capability
+  module into the site context (`contract-context.md`). The harness check uses
+  it too, so it sees the context the server will get.
 - It exports the element's class, `DictaAction`, and the types a capability
   module is written with: `CapabilityModule`, `Capability`, `Level`, `Schema`
   and `SiteContext`. The harness check types a module against them.
