@@ -3,8 +3,7 @@
 ## Flow
 
 ```
-application --text--> dicta-action-js (browser) --round--> dicta-action-server
-                                                <--reply--
+application --text--> dicta-action-js (browser) <--rounds--> dicta-action-server
 ```
 
 1. The page loads `dicta-action-js` and the site's capability module, puts the
