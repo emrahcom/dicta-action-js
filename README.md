@@ -10,9 +10,11 @@ change your code.
 
 You put one element on your page: `<dicta-action>`. You pass it the user's
 request as text. The text can come from a text field or from speech, such as
-`dicta-js`.
+[`dicta-js`](https://github.com/emrahcom/dicta-js).
 
-- The element sends the request to `dicta-action-server`, which makes a plan.
+- The element sends the request to
+  [`dicta-action-server`](https://github.com/emrahcom/dicta-action-server),
+  which makes a plan.
 - The element runs the plan with your site's own functions, with the user's
   rights. It never runs code it receives.
 - Before a risky step, such as a delete, it asks the user to continue or cancel.
