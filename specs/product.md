@@ -47,6 +47,6 @@ calling the site's capability functions, with the user's own rights.
 - A question from the server is shown with its options as buttons. While a
   question is open, the next text the application passes is the answer.
 - Everything shown is short: the user wants the task done, not to read.
-- A request goes on on the new page when a step changes the page, and ends when
-  the page changes at any other time (`contract-protocol.md` in
-  `dicta-action-server`, Page changes).
+- A request goes on in the new page when a step of a capability with `pageLoad`
+  loads it. A page load at any other time ends the request
+  (`contract-protocol.md` in `dicta-action-server`, Page changes).
