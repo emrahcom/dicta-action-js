@@ -33,9 +33,10 @@ names them without the repo.
 - It also exports `buildContext`, which the element uses to turn a capability
   module into the site context (`contract-context.md`). The harness check uses
   it too, so it sees the context the server will get.
-- It exports the element's class, `DictaAction`, and the types a capability
-  module is written with: `CapabilityModule`, `Capability`, `Level`, `Schema`
-  and `SiteContext`. The harness check types a module against them.
+- It exports the element's class, `DictaAction`, the types a capability module
+  is written with (`CapabilityModule`, `Capability`, `Level` and `Schema`) and
+  `SiteContext`, the type `buildContext` returns. The harness check types a
+  module against the module types.
 - Importing the package defines `<dicta-action>`, a custom element, so it works
   in any page and with any UI framework. Its markup and styles live in a shadow
   root, so the page's styles do not break it.
