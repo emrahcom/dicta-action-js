@@ -4,7 +4,7 @@
 // and, unless set, this page's origin as its server.
 // The server's responses are faked with reply().
 
-import type { Page, Route } from "@playwright/test";
+import type { Locator, Page, Route } from "@playwright/test";
 
 export const ROUND = "**/dicta-action/v1/round";
 
@@ -168,4 +168,13 @@ export function history(page: Page) {
         sessionStorage.getItem("dicta-action-history") ?? "[]",
       ) as Record<string, unknown>[],
   );
+}
+
+// Where an element is on the page, for layout tests.
+export async function box(locator: Locator) {
+  const found = await locator.boundingBox();
+  if (found === null) {
+    throw new Error("not shown");
+  }
+  return found;
 }

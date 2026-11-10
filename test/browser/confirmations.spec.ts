@@ -1,6 +1,7 @@
 import { expect, type Page, test } from "@playwright/test";
 import {
   ANNOUNCE_DELAY_MS,
+  box,
   deleted,
   holdStep,
   openPage,
@@ -46,6 +47,24 @@ test("a destructive step shows the confirmation view", async ({ page }) => {
     "Working Deleting the task Delete task t1",
   );
   expect(await deleted(page)).toEqual([]);
+});
+
+test("a confirmation has Continue and Cancel side by side under its text", async ({
+  page,
+}) => {
+  await replies(page, deleteOne, done);
+  await openPage(page);
+  await submit(page, "delete it");
+  const buttons = page.locator('[part~="buttons"] button');
+  await expect(buttons).toHaveText(["Continue", "Cancel"]);
+  const shown = await box(page.locator(text));
+  const [go, cancel] = await Promise.all(
+    [0, 1].map((i) => box(buttons.nth(i))),
+  );
+  expect(go.y).toBeGreaterThanOrEqual(shown.y + shown.height);
+  expect(go.x).toBe(shown.x);
+  expect(cancel.y).toBe(go.y);
+  expect(cancel.x).toBeGreaterThan(go.x + go.width);
 });
 
 test("Continue runs the step and reports it", async ({ page }) => {

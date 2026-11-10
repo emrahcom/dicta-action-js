@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import {
   ANNOUNCE_DELAY_MS,
+  box,
   holdRounds,
   openPage,
   pauseClock,
@@ -40,6 +41,27 @@ test("a question shows its text, its options and Cancel", async ({ page }) => {
   await expect(page.locator('[role="status"]')).toHaveText(
     "Working Which Friday? This week Next week",
   );
+});
+
+test("a question stacks its options and Cancel under its text", async ({
+  page,
+}) => {
+  await replies(page, question);
+  await openPage(page);
+  await submit(page, "move the tasks");
+  const buttons = page.locator('[part~="buttons"] button');
+  await expect(buttons).toHaveText(["This week", "Next week", "Cancel"]);
+  const text = await box(page.locator('[part~="text"]'));
+  const [first, second, cancel] = await Promise.all(
+    [0, 1, 2].map((i) => box(buttons.nth(i))),
+  );
+  // One per line, at the left edge of the text.
+  expect(first.y).toBeGreaterThanOrEqual(text.y + text.height);
+  expect(second.y).toBeGreaterThanOrEqual(first.y + first.height);
+  expect(cancel.y).toBeGreaterThanOrEqual(second.y + second.height);
+  for (const button of [first, second, cancel]) {
+    expect(button.x).toBe(text.x);
+  }
 });
 
 test("a submit answers the question in the next round", async ({ page }) => {

@@ -96,21 +96,38 @@ const STYLE = `
     flex-direction: column;
     gap: 0.5rem;
   }
+  /* The parts stack, the buttons last (specs/architecture.md, Display). */
   .view,
   .notice {
     display: flex;
-    flex-wrap: wrap;
+    flex-direction: column;
+    align-items: flex-start;
     gap: 0.5rem;
-    align-items: center;
     padding: 0.5rem;
     border: 1px solid #888;
     background: #fff;
     color: #222;
   }
   .text {
-    flex: 1 1 12rem;
+    max-width: 100%;
+    overflow-wrap: anywhere;
     /* An info keeps its paragraphs. */
     white-space: pre-line;
+  }
+  .status {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+  .buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  /* A question's options, one per line. */
+  .buttons.column {
+    flex-direction: column;
+    align-items: flex-start;
   }
   .label:empty {
     display: none;
@@ -720,15 +737,17 @@ export class DictaAction extends HTMLElement {
       });
       this.#setView("confirmation", [
         ...elements,
-        this.#button("continue", () => {
-          request.phase = "running";
-          this.#showWorking(label);
-          resolve(true);
-        }),
-        this.#button("cancel", () => {
-          this.#cancel();
-          resolve(false);
-        }),
+        this.#buttons([
+          this.#button("continue", () => {
+            request.phase = "running";
+            this.#showWorking(label);
+            resolve(true);
+          }),
+          this.#button("cancel", () => {
+            this.#cancel();
+            resolve(false);
+          }),
+        ]),
       ]);
       this.#announce(texts.join("\n"));
     });
@@ -743,6 +762,16 @@ export class DictaAction extends HTMLElement {
     return button;
   }
 
+  // The box under the rest of a view or a notice that holds its buttons. In a
+  // column, one button per line.
+  #buttons(buttons: HTMLElement[], column = false) {
+    const box = document.createElement("div");
+    box.className = column ? "buttons column" : "buttons";
+    box.part.add("buttons");
+    box.append(...buttons);
+    return box;
+  }
+
   #showWorking(text?: string) {
     const indicator = document.createElement("span");
     indicator.className = "indicator";
@@ -752,10 +781,13 @@ export class DictaAction extends HTMLElement {
     label.className = "label";
     label.part.add("label");
     label.textContent = text ?? "";
+    // The indicator and the label stay on one line.
+    const status = document.createElement("div");
+    status.className = "status";
+    status.append(indicator, label);
     this.#setView("working", [
-      indicator,
-      label,
-      this.#button("cancel", () => this.#cancel()),
+      status,
+      this.#buttons([this.#button("cancel", () => this.#cancel())]),
     ]);
   }
 
@@ -772,10 +804,13 @@ export class DictaAction extends HTMLElement {
       button.addEventListener("click", () => this.#answer(request, option));
       return button;
     });
+    // Cancel is in the same column, after the options.
     this.#setView("question", [
       element,
-      ...buttons,
-      this.#button("cancel", () => this.#cancel()),
+      this.#buttons(
+        [...buttons, this.#button("cancel", () => this.#cancel())],
+        true,
+      ),
     ]);
     // With its options, so a screen reader user knows they are there.
     this.#announce([text, ...options].join("\n"));
@@ -840,7 +875,7 @@ export class DictaAction extends HTMLElement {
     // Every notice can be closed at once.
     notice.append(
       element,
-      this.#button("close", () => this.#removeNotice(notice)),
+      this.#buttons([this.#button("close", () => this.#removeNotice(notice))]),
     );
     if (info) {
       this.#infos.add(notice);

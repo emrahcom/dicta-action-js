@@ -1,7 +1,9 @@
 import { expect, type Page, test } from "@playwright/test";
 import {
   ANNOUNCE_DELAY_MS,
+  box,
   holdRounds,
+  holdStep,
   openPage,
   pauseClock,
   replies,
@@ -63,6 +65,40 @@ test("while waiting, the working view shows the indicator and Cancel", async ({
       document.querySelector("dicta-action")?.matches(":state(working)"),
     ),
   ).toBe(true);
+});
+
+test("the working view and a notice have their button on its own line", async ({
+  page,
+}) => {
+  await replies(page, {
+    type: "plan",
+    plan: { steps: [{ call: "tasks.list", args: {} }], text: "Listing" },
+  });
+  // A still indicator, so its box does not turn.
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await openPage(page);
+  await holdStep(page, "tasks.list");
+  await submit(page, "a");
+  await expect(page.locator('[part~="label"]')).toHaveText("Listing");
+  const indicator = await box(page.locator('[part~="indicator"]'));
+  const label = await box(page.locator('[part~="label"]'));
+  const cancel = await box(page.locator('[part~="buttons"] [part~="cancel"]'));
+  // The indicator and the label stay on one line, Cancel under them.
+  expect(label.x).toBeGreaterThan(indicator.x);
+  expect(cancel.y).toBeGreaterThanOrEqual(
+    Math.max(indicator.y + indicator.height, label.y + label.height),
+  );
+  expect(cancel.x).toBe(indicator.x);
+});
+
+test("a notice has Close on its own line under its text", async ({ page }) => {
+  await reply(page, { type: "stop", text: "No." });
+  await openPage(page);
+  await submit(page, "a");
+  const text = await box(page.locator(`${notice} .text`));
+  const close = await box(page.locator(`${notice} [part~="buttons"] button`));
+  expect(close.y).toBeGreaterThanOrEqual(text.y + text.height);
+  expect(close.x).toBe(text.x);
 });
 
 test("text while waiting is held until the response", async ({ page }) => {
