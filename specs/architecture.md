@@ -72,6 +72,8 @@ CSS parts let the integrator style or hide each part of the element:
 - `indicator`: the progress indicator.
 - `label`: the `working` view's label: the plan's label or the `pageLoad` text.
 - `text`: the text of a question or a confirmation.
+- `buttons`: the box that holds the buttons of a view or a notice, under the
+  rest of it (Display).
 - `option`, `continue`, `cancel`: the buttons of a view.
 - `notice`: each notice (Display).
 - `close`: the Close button of a notice.
@@ -142,6 +144,14 @@ placed to fit the view:
   (`contract-plan.md`, Confirmation), Continue and Cancel. The items and counts
   come from `contract-plan.md`, Confirmation; a count is shown with the `items`
   string.
+
+The buttons go under the text or the label, in their own `buttons` box, aligned
+to the left:
+
+- `question`: the options, one per line, then Cancel on a line of its own, so it
+  does not look like another answer.
+- `confirmation`: Continue and Cancel side by side on one line.
+- `working` and a notice: their button on a line of its own.
 
 An answer or Continue brings back `working`. Cancel in any view cancels the
 request (`contract-protocol.md`, Added text and cancel).
