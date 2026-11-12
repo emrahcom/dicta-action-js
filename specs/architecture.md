@@ -113,7 +113,10 @@ The text becomes the request's `text`, a question's `answer` or an `added` item
 (`contract-protocol.md`, Request body).
 
 Before each round the element calls `module.state.run()` for `state` and takes
-`time` from the browser (`contract-protocol.md`, Request body).
+`time` from the browser (`contract-protocol.md`, Request body). It sends
+`history` from `dicta-action-history` (Storage): the short entry of each
+request, oldest first, with the fields in the contract's order
+(`contract-protocol.md`, History).
 
 A round is `POST <server>/dicta-action/v1/round`. A `401` gets a new token and
 one more try with the same body. Every other HTTP error, a network failure, a
@@ -216,8 +219,9 @@ The element keeps two entries in the tab's `sessionStorage`, as JSON:
   (`contract-protocol.md`, Page changes).
 - `dicta-action-history`: the finished requests, newest first, each with
   `requestId`, `time`, `text`, `outcome` and `exchange`. As many as
-  `contract-capability.md`, History allows; when storage is full, the oldest go
-  first, also to make room for the saved request.
+  `contract-protocol.md`, History allows; when storage is full, the oldest go
+  first, also to make room for the saved request. The element reverses them for
+  `history`, which is oldest first.
 
 When the element has its `server` and `module`, it looks for a saved request,
 takes it out and goes on or ends it (`contract-protocol.md`, Page changes). It
@@ -231,9 +235,8 @@ back/forward cache (`pageshow`).
 `dictaCapabilities` holds the built-in capabilities (`contract-capability.md`,
 Built-in capabilities).
 
-The history capabilities, `dicta.listHistory` and `dicta.getHistory`, read
-`dicta-action-history` from session storage themselves, so they do not depend on
-the `<dicta-action>` element.
+`dicta.getHistory` reads `dicta-action-history` from session storage itself, so
+it does not depend on the `<dicta-action>` element.
 
 ## Strings
 

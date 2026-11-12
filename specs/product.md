@@ -15,9 +15,9 @@ calling the site's capability functions, with the user's own rights.
   and loops by calling the site's own functions, and reports the outputs the
   plan asks for. It never runs code it receives.
 - The home of the built-in capabilities, exported as `dictaCapabilities`, and of
-  the history that some of them read: the finished requests of the tab, kept in
-  its session storage (`contract-capability.md` in `dicta-action-server`,
-  Built-in capabilities).
+  the history: the finished requests of the tab, kept in its session storage and
+  sent with every round (`contract-protocol.md` in `dicta-action-server`,
+  History).
 - Independent of where the text comes from: `dicta-js`, a plain text field or
   anything else. The application passes the text in.
 - Independent of UI frameworks: it works in any web page.
