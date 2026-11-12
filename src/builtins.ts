@@ -1,12 +1,11 @@
 // The built-in capabilities, the same on every site, in the `dicta` group
-// (contract-capability.md, Built-in capabilities). They read the history
-// themselves, so they do not depend on the <dicta-action> element.
+// (contract-capability.md, Built-in capabilities). dicta.getHistory reads the
+// history itself, so it does not depend on the <dicta-action> element.
 
-import { type HistoryEntry, readHistory } from "./history.ts";
+import { readHistory } from "./history.ts";
 import type { Capability, Schema } from "./module.ts";
-import { bytes, cut } from "./run.ts";
+import { bytes } from "./run.ts";
 
-const DEFAULT_LIMIT = 10;
 const MAX_OUTPUT_BYTES = 16 * 1024;
 
 const OUTCOME: Schema = {
@@ -26,19 +25,6 @@ const ENTRY_PROPERTIES: Record<string, Schema> = {
   text: { type: "string", description: "The user's request" },
   outcome: OUTCOME,
 };
-
-// The short entry of dicta.listHistory, with texts cut to 200 characters.
-function short({ requestId, time, text, outcome }: HistoryEntry) {
-  return {
-    requestId,
-    time,
-    text: cut(text),
-    outcome:
-      outcome.text === undefined
-        ? { type: outcome.type }
-        : { type: outcome.type, text: cut(outcome.text) },
-  };
-}
 
 type Report = {
   outputs?: Record<string, unknown>;
@@ -74,36 +60,11 @@ function capabilityError(code: string, message: string) {
   return Object.assign(new Error(message), { code });
 }
 
-const listHistory: Capability = {
-  level: "read",
-  desc:
-    "Earlier requests of this browser tab, newest first, for requests that " +
-    'refer to the past, such as "undo that" or "the same for Friday".',
-  args: {
-    type: "object",
-    properties: {
-      limit: {
-        type: "integer",
-        description: "The most requests it returns, from 1; 10 when left out",
-      },
-    },
-  },
-  output: {
-    type: "array",
-    items: { type: "object", properties: ENTRY_PROPERTIES },
-  },
-  run: async (args) => {
-    const limit = (args.limit as number | undefined) ?? DEFAULT_LIMIT;
-    if (limit < 1) {
-      throw new Error("limit must be 1 or more");
-    }
-    return readHistory().slice(0, limit).map(short);
-  },
-};
-
 const getHistory: Capability = {
   level: "read",
-  desc: "One earlier request of this browser tab in full, with its exchange.",
+  desc:
+    "One earlier request of this browser tab in full, with its exchange, " +
+    "by the requestId of its history entry.",
   args: {
     type: "object",
     properties: { requestId: { type: "string" } },
@@ -125,6 +86,5 @@ const getHistory: Capability = {
 };
 
 export const dictaCapabilities: Record<string, Capability> = {
-  "dicta.listHistory": listHistory,
   "dicta.getHistory": getHistory,
 };

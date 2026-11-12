@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { beforeEach, test } from "node:test";
 import { dictaCapabilities } from "../src/builtins.ts";
-import { addHistory, type HistoryEntry, readHistory } from "../src/history.ts";
+import {
+  addHistory,
+  type HistoryEntry,
+  readHistory,
+  shortHistory,
+} from "../src/history.ts";
 import { saveRequest, takeSaved } from "../src/saved.ts";
 
 // A small session storage for Node, with an optional limit on the length of
@@ -45,36 +50,34 @@ function entry(n: number, extra: Partial<HistoryEntry> = {}): HistoryEntry {
   };
 }
 
-const list = dictaCapabilities["dicta.listHistory"];
 const get = dictaCapabilities["dicta.getHistory"];
 
-test("the built-ins are read capabilities with schemas", () => {
-  for (const capability of [list, get]) {
-    assert.equal(capability.level, "read");
-    assert.equal(typeof capability.desc, "string");
-    assert.equal(capability.args?.type, "object");
-    assert.notEqual(capability.output, undefined);
-  }
+test("the only built-in is dicta.getHistory, a read capability with schemas", () => {
+  assert.deepEqual(Object.keys(dictaCapabilities), ["dicta.getHistory"]);
+  assert.equal(get.level, "read");
+  assert.match(get.desc, /requestId of its history entry/);
+  assert.equal(get.args?.type, "object");
+  assert.notEqual(get.output, undefined);
 });
 
-test("the history is newest first and keeps at most 20", () => {
+test("the history is oldest first and keeps at most 20", () => {
   for (let n = 1; n <= 22; n++) {
     addHistory(entry(n));
   }
   const kept = readHistory();
   assert.equal(kept.length, 20);
-  assert.equal(kept[0].requestId, "r22");
-  assert.equal(kept[19].requestId, "r3");
+  assert.equal(kept[0].requestId, "r3");
+  assert.equal(kept[19].requestId, "r22");
 });
 
 test("when storage is full, the oldest go first", () => {
   addHistory(entry(1));
   addHistory(entry(2));
-  storage.limit = JSON.stringify([entry(3), entry(2)]).length;
+  storage.limit = JSON.stringify([entry(2), entry(3)]).length;
   addHistory(entry(3));
   assert.deepEqual(
     readHistory().map((e) => e.requestId),
-    ["r3", "r2"],
+    ["r2", "r3"],
   );
 });
 
@@ -92,12 +95,12 @@ test("the oldest history requests make room for the saved request", () => {
   // The five history requests fit, but not with the saved request; three do.
   storage.limit =
     JSON.stringify(saved).length +
-    JSON.stringify(readHistory().slice(0, 3)).length;
+    JSON.stringify(readHistory().slice(-3)).length;
   assert.ok(storage.limit >= JSON.stringify(readHistory()).length);
   saveRequest(saved);
   assert.deepEqual(
     readHistory().map((e) => e.requestId),
-    ["r5", "r4", "r3"],
+    ["r3", "r4", "r5"],
   );
   assert.deepEqual(takeSaved(), saved);
 });
@@ -117,45 +120,39 @@ test("storage that cannot be used gives an empty history", () => {
   assert.deepEqual(readHistory(), []);
 });
 
-test("listHistory returns 10 short entries by default", async () => {
-  for (let n = 1; n <= 12; n++) {
-    addHistory(entry(n, { exchange: [{ added: "x" }] }));
-  }
-  const result = (await list.run({})) as unknown[];
-  assert.equal(result.length, 10);
-  assert.deepEqual(result[0], {
-    requestId: "r12",
-    time: "2026-10-29T10:15:00+01:00",
-    text: "request 12",
-    outcome: { type: "done", text: "Done 12" },
-  });
-});
-
-test("listHistory takes a limit and cuts texts to 200", async () => {
+test("the short history is oldest first, short fields first, texts cut to 200", () => {
   addHistory(
     entry(1, {
-      text: "a".repeat(300),
+      text: "\u{1F600}".repeat(300),
       outcome: { type: "stop", text: "b".repeat(300) },
+      exchange: [{ added: "x" }],
     }),
   );
   addHistory(entry(2, { outcome: { type: "cancelled" } }));
-  const result = (await list.run({ limit: 2 })) as {
-    text: string;
-    outcome: { text?: string };
-  }[];
-  assert.equal(result.length, 2);
-  assert.deepEqual(result[0].outcome, { type: "cancelled" });
-  assert.equal(result[1].text, "a".repeat(200));
-  assert.equal(result[1].outcome.text, "b".repeat(200));
+  const result = shortHistory();
+  assert.equal(
+    JSON.stringify(result[1]),
+    '{"requestId":"r2","time":"2026-10-29T10:15:00+01:00",' +
+      '"outcome":{"type":"cancelled"},"text":"request 2"}',
+  );
+  assert.deepEqual(result[0], {
+    requestId: "r1",
+    time: "2026-10-29T10:15:00+01:00",
+    outcome: { type: "stop", text: "b".repeat(200) },
+    text: "\u{1F600}".repeat(200),
+  });
 });
 
-test("listHistory fails with capability for a limit under 1", async () => {
-  await assert.rejects(
-    list.run({ limit: 0 }),
-    (err: Error & { code?: string }) => {
-      return err.code === undefined && /limit/.test(err.message);
+test("the short history is empty without a history or storage", () => {
+  assert.deepEqual(shortHistory(), []);
+  Object.assign(globalThis, {
+    sessionStorage: {
+      getItem() {
+        throw new Error("SecurityError");
+      },
     },
-  );
+  });
+  assert.deepEqual(shortHistory(), []);
 });
 
 test("getHistory returns a request in full", async () => {

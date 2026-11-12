@@ -2,6 +2,7 @@
 // (contract-protocol.md, Round, Request body, Response body, Errors).
 
 import { buildContext, type SiteContext } from "./context.ts";
+import { shortHistory } from "./history.ts";
 import type { CapabilityModule } from "./module.ts";
 
 export type Reply =
@@ -83,6 +84,7 @@ export class RoundClient {
       time: localTime(new Date()),
       state,
       context: this.#context,
+      history: shortHistory(),
       exchange: round.exchange,
     });
 

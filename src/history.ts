@@ -1,5 +1,7 @@
 // The history: the finished requests of the browser tab, kept in its session
-// storage (specs/architecture.md, Storage; contract-capability.md, History).
+// storage (specs/architecture.md, Storage; contract-protocol.md, History).
+
+import { cut } from "./run.ts";
 
 const KEY = "dicta-action-history";
 const MAX_REQUESTS = 20;
@@ -17,7 +19,7 @@ export type HistoryEntry = {
   exchange: unknown[];
 };
 
-// The kept requests, newest first. Storage that cannot be read gives none.
+// The kept requests, oldest first. Storage that cannot be read gives none.
 export function readHistory(): HistoryEntry[] {
   try {
     const list: unknown = JSON.parse(sessionStorage.getItem(KEY) ?? "[]");
@@ -30,13 +32,13 @@ export function readHistory(): HistoryEntry[] {
 // Adds a finished request. When storage is full, the oldest requests go
 // first; storage that cannot be used is left alone.
 export function addHistory(entry: HistoryEntry) {
-  const list = [entry, ...readHistory()].slice(0, MAX_REQUESTS);
+  const list = [...readHistory(), entry].slice(-MAX_REQUESTS);
   while (list.length > 0) {
     try {
       sessionStorage.setItem(KEY, JSON.stringify(list));
       return;
     } catch {
-      list.pop();
+      list.shift();
     }
   }
 }
@@ -49,9 +51,24 @@ export function dropOldestHistory() {
     return false;
   }
   try {
-    sessionStorage.setItem(KEY, JSON.stringify(list.slice(0, -1)));
+    sessionStorage.setItem(KEY, JSON.stringify(list.slice(1)));
     return true;
   } catch {
     return false;
   }
+}
+
+// The history a round sends: a short entry for each kept request, oldest
+// first, its short fields first and its texts cut to 200 characters
+// (contract-protocol.md, History).
+export function shortHistory() {
+  return readHistory().map(({ requestId, time, outcome, text }) => ({
+    requestId,
+    time,
+    outcome:
+      outcome.text === undefined
+        ? { type: outcome.type }
+        : { type: outcome.type, text: cut(outcome.text) },
+    text: cut(text),
+  }));
 }

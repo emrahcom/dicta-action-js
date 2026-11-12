@@ -34,7 +34,7 @@ test("a done request is stored with its exchange", async ({ page }) => {
   });
 });
 
-test("stops and infos are stored newest first", async ({ page }) => {
+test("stops and infos are stored oldest first", async ({ page }) => {
   await replies(
     page,
     { type: "stop", text: "No." },
@@ -51,9 +51,9 @@ test("stops and infos are stored newest first", async ({ page }) => {
   await submit(page, "c");
   await expect.poll(async () => (await history(page)).length).toBe(3);
   expect((await history(page)).map((e) => e.outcome)).toEqual([
-    { type: "done" },
-    { type: "info", text: "Like this." },
     { type: "stop", text: "No." },
+    { type: "info", text: "Like this." },
+    { type: "done" },
   ]);
 });
 
@@ -152,13 +152,14 @@ test("a cancel at a confirmation is stored with its report", async ({
   });
 });
 
-test("a plan reads the history with the built-ins", async ({ page }) => {
+test("a plan reads a request of the history with the built-in", async ({
+  page,
+}) => {
   const plan = {
     steps: [
-      { call: "dicta.listHistory", args: { limit: 1 } },
       {
         call: "dicta.getHistory",
-        args: { requestId: "$1.0.requestId" },
+        args: { requestId: "r1" },
         includeOutput: true,
       },
     ],
@@ -187,7 +188,7 @@ test("a plan reads the history with the built-ins", async ({ page }) => {
   await expect.poll(() => bodies.length).toBe(3);
   expect(bodies[1].context).toMatchObject({
     capabilities: expect.arrayContaining([
-      expect.objectContaining({ name: "dicta.listHistory", level: "read" }),
+      expect.objectContaining({ name: "dicta.getHistory", level: "read" }),
     ]),
   });
   expect(bodies[2].exchange).toEqual([
@@ -195,7 +196,7 @@ test("a plan reads the history with the built-ins", async ({ page }) => {
       plan,
       report: {
         outputs: {
-          2: {
+          1: {
             requestId: "r1",
             time: expect.stringMatching(TIME),
             text: "first",
@@ -206,4 +207,58 @@ test("a plan reads the history with the built-ins", async ({ page }) => {
       },
     },
   ]);
+});
+
+test("each round sends the history, oldest first, texts cut", async ({
+  page,
+}) => {
+  const plan = { steps: [list] };
+  const bodies = await replies(
+    page,
+    { type: "stop", text: "x".repeat(300) },
+    { type: "plan", plan },
+    { type: "done" },
+  );
+  await openPage(page);
+  await submit(page, "\u{1F600}".repeat(300));
+  await expect.poll(async () => (await history(page)).length).toBe(1);
+  await submit(page, "list the tasks");
+  await expect.poll(() => bodies.length).toBe(3);
+  expect(bodies[0].history).toEqual([]);
+  const sent = [
+    {
+      requestId: "r1",
+      time: expect.stringMatching(TIME),
+      outcome: { type: "stop", text: "x".repeat(200) },
+      text: "\u{1F600}".repeat(200),
+    },
+  ];
+  // The same history in every round of the request.
+  expect(bodies[1].history).toEqual(sent);
+  expect(bodies[2].history).toEqual(sent);
+  expect(Object.keys((bodies[1].history as object[])[0])).toEqual([
+    "requestId",
+    "time",
+    "outcome",
+    "text",
+  ]);
+});
+
+test("the 21st request drops the oldest from the history", async ({ page }) => {
+  const bodies = await replies(page);
+  await openPage(page);
+  for (let n = 1; n <= 21; n++) {
+    await submit(page, `request ${n}`);
+    await expect
+      .poll(async () => (await history(page)).at(-1)?.text)
+      .toBe(`request ${n}`);
+  }
+  const stored = await history(page);
+  expect(stored[0].text).toBe("request 2");
+  expect(stored[19].text).toBe("request 21");
+  // The 21st request was sent with the 20 before it.
+  const sent = bodies[20].history as { text: string }[];
+  expect(sent.map((e) => e.text)).toEqual(
+    Array.from({ length: 20 }, (_, i) => `request ${i + 1}`),
+  );
 });

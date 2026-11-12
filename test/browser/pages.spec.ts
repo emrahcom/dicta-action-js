@@ -33,6 +33,20 @@ test("a step that loads a page reports navigated at the next step", async ({
   };
   const bodies = await replies(page, { type: "plan", plan }, { type: "done" });
   await openApp(page);
+  await page.evaluate(() =>
+    sessionStorage.setItem(
+      "dicta-action-history",
+      JSON.stringify([
+        {
+          requestId: "r0",
+          time: "2026-11-12T10:00:00+01:00",
+          text: "earlier",
+          outcome: { type: "done" },
+          exchange: [],
+        },
+      ]),
+    ),
+  );
   await submit(page, "reload");
   await expect.poll(() => bodies.length, { timeout: 10_000 }).toBe(2);
   expect(bodies[1]).toMatchObject({
@@ -49,6 +63,16 @@ test("a step that loads a page reports navigated at the next step", async ({
       },
     ],
   });
+  // The request that goes on sends the same history as before the page load.
+  expect(bodies[0].history).toEqual([
+    {
+      requestId: "r0",
+      time: "2026-11-12T10:00:00+01:00",
+      outcome: { type: "done" },
+      text: "earlier",
+    },
+  ]);
+  expect(bodies[1].history).toEqual(bodies[0].history);
   // The saved request is taken out once.
   expect(
     await page.evaluate(() => sessionStorage.getItem("dicta-action-saved")),
