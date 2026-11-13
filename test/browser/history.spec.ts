@@ -262,3 +262,17 @@ test("the 21st request drops the oldest from the history", async ({ page }) => {
     Array.from({ length: 20 }, (_, i) => `request ${i + 1}`),
   );
 });
+
+test("every request of the tab sends the same tab id", async ({ page }) => {
+  const bodies = await replies(page, { type: "done" }, { type: "done" });
+  await openPage(page);
+  await submit(page, "a");
+  await expect.poll(async () => (await history(page)).length).toBe(1);
+  await submit(page, "b");
+  await expect.poll(() => bodies.length).toBe(2);
+  expect(bodies[0].tabId).toMatch(/^[0-9a-f]{32}$/);
+  expect(bodies[1].tabId).toBe(bodies[0].tabId);
+  expect(
+    await page.evaluate(() => sessionStorage.getItem("dicta-action-tab-id")),
+  ).toBe(JSON.stringify(bodies[0].tabId));
+});

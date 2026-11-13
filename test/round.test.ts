@@ -62,6 +62,7 @@ test("a round posts the body and returns the reply", async () => {
   assert.equal(header(calls[0], "Content-Type"), "application/json");
   assert.equal(header(calls[0], "Authorization"), undefined);
   const sent = body(calls[0]);
+  assert.match(sent.tabId as string, /^[0-9a-f]{32}$/);
   assert.equal(Object.hasOwn(sent, "requestId"), false);
   assert.equal(sent.text, "hi");
   assert.deepEqual(sent.state, { page: "tasks" });

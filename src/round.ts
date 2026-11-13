@@ -4,6 +4,7 @@
 import { buildContext, type SiteContext } from "./context.ts";
 import { shortHistory } from "./history.ts";
 import type { CapabilityModule } from "./module.ts";
+import { tabId } from "./tab.ts";
 
 export type Reply =
   | { type: "plan"; plan: unknown }
@@ -79,6 +80,7 @@ export class RoundClient {
       throw new Error(`state.run failed: ${message(err)}`);
     }
     const body = JSON.stringify({
+      tabId: tabId(),
       ...(round.requestId === undefined ? {} : { requestId: round.requestId }),
       text: round.text,
       time: localTime(new Date()),

@@ -73,6 +73,9 @@ test("a step that loads a page reports navigated at the next step", async ({
     },
   ]);
   expect(bodies[1].history).toEqual(bodies[0].history);
+  // And the same tab id.
+  expect(bodies[0].tabId).toMatch(/^[0-9a-f]{32}$/);
+  expect(bodies[1].tabId).toBe(bodies[0].tabId);
   // The saved request is taken out once.
   expect(
     await page.evaluate(() => sessionStorage.getItem("dicta-action-saved")),
