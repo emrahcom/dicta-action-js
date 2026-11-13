@@ -113,10 +113,10 @@ The text becomes the request's `text`, a question's `answer` or an `added` item
 (`contract-protocol.md`, Request body).
 
 Before each round the element calls `module.state.run()` for `state` and takes
-`time` from the browser (`contract-protocol.md`, Request body). It sends
-`history` from `dicta-action-history` (Storage): the short entry of each
-request, oldest first, with the fields in the contract's order
-(`contract-protocol.md`, History).
+`time` from the browser (`contract-protocol.md`, Request body). It sends `tabId`
+from `dicta-action-tab-id` (Storage) and `history` from `dicta-action-history`
+(Storage): the short entry of each request, oldest first, with the fields in the
+contract's order (`contract-protocol.md`, History).
 
 A round is `POST <server>/dicta-action/v1/round`. A `401` gets a new token and
 one more try with the same body. Every other HTTP error, a network failure, a
@@ -210,8 +210,12 @@ The runner follows `contract-plan.md` and builds the report of
 
 ## Storage
 
-The element keeps two entries in the tab's `sessionStorage`, as JSON:
+The element keeps three entries in the tab's `sessionStorage`, as JSON:
 
+- `dicta-action-tab-id`: the tab id, 16 bytes from `crypto.getRandomValues()` in
+  hex, made before the first round when none is stored. When it cannot be read
+  or stored, the element keeps a new one in the page's memory, so the tab id
+  lasts only for that page (`contract-protocol.md`, Request body).
 - `dicta-action-saved`: the request saved on `pagehide` while the element waits
   for a page load: `savedAt` (milliseconds since 1970, for the 60 second check),
   `requestId`, `text`, `exchange`, the plan, its report, with the halt
