@@ -32,7 +32,7 @@ calling the site's capability functions, with the user's own rights.
   reports back.
 - Not the place for authentication. The application's backend issues the token.
 
-## First version
+## Features
 
 - The site registers its capability module (`contract-capability.md` in
   `dicta-action-server`) and, when the server checks tokens, a token function.
