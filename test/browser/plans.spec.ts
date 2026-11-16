@@ -262,3 +262,45 @@ for (const [name, text, shown] of [
     await expect(page.locator(label)).toHaveText("Thinking...");
   });
 }
+
+// Old outputs (contract-protocol.md in dicta-action-server, Request body).
+
+test("plans before the last two keep only their small outputs", async ({
+  page,
+}) => {
+  const plan = {
+    type: "plan",
+    plan: {
+      steps: [
+        { call: "tasks.list", args: {}, includeOutput: true },
+        { call: "tasks.list", args: {}, includeOutput: true },
+      ],
+    },
+  };
+  const bodies = await replies(page, plan, plan, plan, done);
+  await openPage(page);
+  // A list of 30 tasks, well over 512 bytes.
+  const tasks = Array.from({ length: 30 }, (_, i) => ({
+    id: `t${i}`,
+    title: "x".repeat(20),
+  }));
+  // The first call of each plan returns the large list, the second a small one.
+  await page.evaluate((list) => {
+    const element = document.querySelector("dicta-action") as unknown as {
+      module: { capabilities: Record<string, { run: () => Promise<unknown> }> };
+    };
+    let calls = 0;
+    element.module.capabilities["tasks.list"].run = async () => {
+      calls += 1;
+      return calls % 2 === 1 ? list : [{ id: "t9" }];
+    };
+  }, tasks);
+  await submit(page, "a");
+  await expect.poll(() => bodies.length).toBe(4);
+  const full = { outputs: { 1: tasks, 2: [{ id: "t9" }] } };
+  expect(bodies[3].exchange).toEqual([
+    { plan: plan.plan, report: { outputs: { 2: [{ id: "t9" }] } } },
+    { plan: plan.plan, report: full },
+    { plan: plan.plan, report: full },
+  ]);
+});

@@ -170,7 +170,7 @@ test("getHistory fails with not_found for an unknown id", async () => {
   });
 });
 
-test("getHistory leaves out report outputs over 16 KB", async () => {
+test("a request over 16 KB is stored and returned without outputs", async () => {
   const big = "a".repeat(9000);
   addHistory(
     entry(1, {
@@ -188,6 +188,8 @@ test("getHistory leaves out report outputs over 16 KB", async () => {
     }),
   );
   const result = (await get.run({ requestId: "r1" })) as HistoryEntry;
+  // Storage holds only what getHistory returns.
+  assert.deepEqual(readHistory()[0], result);
   assert.deepEqual(result.exchange, [
     {
       plan: { steps: [] },

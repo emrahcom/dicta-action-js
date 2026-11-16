@@ -10,6 +10,7 @@ import {
   runPlan,
   type Shown,
   type Stop,
+  withoutOldOutputs,
 } from "../src/run.ts";
 
 type Args = Record<string, unknown>;
@@ -1180,4 +1181,50 @@ test("Cancel at many write steps halts at the first", async () => {
   });
   // No update ran; this module's tasks.list is not recorded.
   assert.equal(calls.length, 0);
+});
+
+// Old outputs (contract-protocol.md, Request body).
+
+function planItem(report: Record<string, unknown>) {
+  return { plan: { steps: [] }, report };
+}
+
+const small = "s".repeat(510); // 512 bytes as JSON
+const large = "l".repeat(511); // 513 bytes as JSON
+
+test("plans before the last two lose their outputs over 512 bytes", () => {
+  const exchange = [
+    planItem({
+      outputs: { 1: small, 2: large },
+      tooLarge: { 3: 99999 },
+      halt: { step: 4, code: "x", message: "m", outputs: [[large]] },
+    }),
+    { question: "Which?", answer: "This" },
+    planItem({ outputs: { 1: large } }),
+    { added: "and more" },
+    planItem({ outputs: { 1: large } }),
+    planItem({ outputs: { 1: large } }),
+  ];
+  assert.deepEqual(withoutOldOutputs(exchange), [
+    planItem({
+      outputs: { 1: small },
+      tooLarge: { 3: 99999 },
+      halt: { step: 4, code: "x", message: "m" },
+    }),
+    { question: "Which?", answer: "This" },
+    planItem({}),
+    { added: "and more" },
+    planItem({ outputs: { 1: large } }),
+    planItem({ outputs: { 1: large } }),
+  ]);
+});
+
+test("a small halt output stays and two plans keep everything", () => {
+  const halted = planItem({
+    halt: { step: 1, code: "x", message: "m", outputs: [["t9"]] },
+  });
+  const exchange = [halted, planItem({}), planItem({})];
+  assert.deepEqual(withoutOldOutputs(exchange)[0], halted);
+  const two = [planItem({ outputs: { 1: large } }), planItem({})];
+  assert.deepEqual(withoutOldOutputs(two), two);
 });

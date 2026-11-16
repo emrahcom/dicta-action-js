@@ -61,6 +61,47 @@ export function bytes(value: unknown) {
   return new TextEncoder().encode(JSON.stringify(value) ?? "null").length;
 }
 
+// The plans whose reports keep every output, counted from the end, and the
+// largest output an older report keeps (contract-protocol.md, Request body).
+const KEPT_PLANS = 2;
+const MAX_OLD_OUTPUT_BYTES = 512;
+
+// The exchange with the large outputs of every plan but the last two left
+// out, from outputs and from halt.outputs; they are not listed in tooLarge.
+// Everything else stays as it is.
+export function withoutOldOutputs(exchange: unknown[]): unknown[] {
+  const plans = exchange.filter(
+    (item) => (item as { report?: unknown }).report !== undefined,
+  );
+  const old = new Set(plans.slice(0, -KEPT_PLANS));
+  return exchange.map((item) => {
+    if (!old.has(item)) {
+      return item;
+    }
+    const report: Report = { ...(item as { report: Report }).report };
+    if (report.outputs !== undefined) {
+      const outputs = Object.fromEntries(
+        Object.entries(report.outputs).filter(
+          ([, output]) => bytes(output) <= MAX_OLD_OUTPUT_BYTES,
+        ),
+      );
+      if (Object.keys(outputs).length > 0) {
+        report.outputs = outputs;
+      } else {
+        delete report.outputs;
+      }
+    }
+    if (
+      report.halt?.outputs !== undefined &&
+      bytes(report.halt.outputs) > MAX_OLD_OUTPUT_BYTES
+    ) {
+      const { outputs: _, ...halt } = report.halt;
+      report.halt = halt;
+    }
+    return { ...(item as object), report };
+  });
+}
+
 // The outputs a reference can use: those of the earlier steps, and the item
 // inside the do of a forEach.
 type Scope = { outputs: unknown[]; item?: unknown };

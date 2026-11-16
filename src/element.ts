@@ -16,6 +16,7 @@ import {
   runPlan,
   type Shown,
   STOP_MESSAGES,
+  withoutOldOutputs,
 } from "./run.ts";
 import { saveRequest, takeSaved } from "./saved.ts";
 
@@ -380,6 +381,7 @@ export class DictaAction extends HTMLElement {
         plan,
         report: reportSoFar(progress, "cancelled", STOP_MESSAGES.cancelled),
       });
+      request.exchange = withoutOldOutputs(request.exchange);
     }
     this.#store(request, { type: "cancelled" });
   }
@@ -594,6 +596,7 @@ export class DictaAction extends HTMLElement {
     request.plan = undefined;
     request.progress = undefined;
     request.exchange.push({ plan, report });
+    request.exchange = withoutOldOutputs(request.exchange);
     if (this.#request !== request) {
       // Cancelled while the plan ran: stored with this last report.
       if (!request.left) {
