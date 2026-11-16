@@ -43,7 +43,11 @@ calling the site's capability functions, with the user's own rights.
   the plan, and the server decides what comes next (`contract-protocol.md` in
   `dicta-action-server`, Added text and cancel).
 - Before a risky step, the user presses Continue or Cancel (`contract-plan.md`
-  in `dicta-action-server`, Confirmation).
+  in `dicta-action-server`, Confirmation). A long request also asks from time to
+  time whether to go on (Checkpoint there).
+- While a request runs, the element shows what happens: "Thinking..." while it
+  waits for the server, the running step's text or the plan's label, and how
+  many items of a loop are done.
 - A question from the server is shown with its options as buttons. While a
   question is open, the next text the application passes is the answer.
 - Everything shown is short: the user wants the task done, not to read.
