@@ -146,7 +146,9 @@ placed to fit the view:
 - `confirmation`: only the texts from the module's `confirm` as plain text
   (`contract-plan.md`, Confirmation), Continue and Cancel. The items and counts
   come from `contract-plan.md`, Confirmation; a count is shown with the `items`
-  string.
+  string. A checkpoint (`contract-plan.md`, Checkpoint) shows the plan's
+  `progress`, or the `checkpoint` string when there is none, with Continue and
+  Cancel.
 
 The buttons go under the text or the label, in their own `buttons` box, aligned
 to the left:
@@ -248,6 +250,8 @@ for example with the site's own translations:
 
 - `continue`: "Continue"
 - `cancel`: "Cancel"
+- `checkpoint`: "Do you want to go on?", for a checkpoint without a progress
+  (Display)
 - `close`: "Close", for a notice
 - `done`: "Done", announced only, for a done without a text (Accessibility)
 - `errorNotice`: "Something went wrong"
