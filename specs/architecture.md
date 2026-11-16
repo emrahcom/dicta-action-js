@@ -142,7 +142,7 @@ placed to fit the view:
   (`contract-plan.md`, Label), and the `pageLoad` text while the element waits
   for a page load, announced once when the wait starts. During a `forEach`, the
   label ends with the items done and all items, such as `40/80`, updated after
-  each item. Only the plan's label is announced, as before. The indicator is a
+  each item. The step text and the count are shown only. The indicator is a
   small spinner drawn with CSS. When the user prefers reduced motion
   (`prefers-reduced-motion`), it stands still.
 - `question`: the question's text, its options as buttons and Cancel. Pressing
