@@ -84,6 +84,10 @@ const VALID: [string, unknown][] = [
   ["a final plan", { steps: [list], final: true }],
   ["a plan with a label", { steps: [list], text: "Listing the tasks" }],
   [
+    "a checkpoint with a progress of 200 characters",
+    { steps: [list], checkpoint: true, progress: "\u{1F600}".repeat(200) },
+  ],
+  [
     "a label of 200 characters",
     { steps: [list], text: "\u{1F600}".repeat(200) },
   ],
@@ -202,6 +206,21 @@ const INVALID: [string, unknown, RegExp][] = [
   ],
   ["final that is not a boolean", { steps: [], final: "yes" }, /final must be/],
   ["a label that is not text", { steps: [], text: 5 }, /text must be a string/],
+  [
+    "checkpoint that is not a boolean",
+    { steps: [], checkpoint: "yes" },
+    /checkpoint must be/,
+  ],
+  [
+    "a progress that is not text",
+    { steps: [], progress: 5 },
+    /progress must be a string/,
+  ],
+  [
+    "a progress of 201 characters",
+    { steps: [], progress: "x".repeat(201) },
+    /progress is longer than 200 characters/,
+  ],
   [
     "a label of 201 characters",
     { steps: [], text: "x".repeat(201) },

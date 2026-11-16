@@ -61,6 +61,8 @@ const LEAVING_MS = 1000;
 const STRINGS = {
   continue: "Continue",
   cancel: "Cancel",
+  // For a checkpoint without a progress.
+  checkpoint: "Do you want to go on?",
   close: "Close",
   // Announced only, never shown (specs/architecture.md, Accessibility).
   done: "Done",
@@ -720,6 +722,9 @@ export class DictaAction extends HTMLElement {
       }
       request.phase = "confirmation";
       const texts = confirmation.items.map((item) => item.join("\n"));
+      if (confirmation.checkpoint && texts.length === 0) {
+        texts.push(this.#string("checkpoint"));
+      }
       if (confirmation.count !== undefined) {
         texts.push(
           this.#string("items").replaceAll(

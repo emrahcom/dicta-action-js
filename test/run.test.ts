@@ -561,6 +561,52 @@ test("Cancel halts with cancelled and runs nothing more", async () => {
   assert.deepEqual(calls, [["tasks.update", { id: "t1" }]]);
 });
 
+// Checkpoints (contract-plan.md, Checkpoint).
+
+test("a checkpoint asks once with its progress, before its first step", async () => {
+  answer = true;
+  const report = await run(
+    {
+      steps: [
+        { call: "tasks.delete", args: { id: "t1" } },
+        { call: "tasks.update", args: { id: "t2" } },
+      ],
+      checkpoint: true,
+      progress: "Half done. Shall I go on?",
+    },
+    confirmModule(0),
+  );
+  assert.deepEqual(asked, [
+    { items: [["Half done. Shall I go on?"]], checkpoint: true },
+    { items: [["Delete t1"]] },
+  ]);
+  assert.deepEqual(report, {});
+  assert.equal(calls.length, 2);
+});
+
+test("a checkpoint without a progress asks with no item", async () => {
+  answer = true;
+  await run({ steps: [list], checkpoint: true });
+  assert.deepEqual(asked, [{ items: [], checkpoint: true }]);
+});
+
+test("Cancel at a checkpoint halts at step 1 and runs nothing", async () => {
+  answer = false;
+  const report = await run({ steps: [list], checkpoint: true });
+  answer = true;
+  assert.deepEqual(report.halt, {
+    step: 1,
+    code: "cancelled",
+    message: "Cancelled",
+  });
+  assert.deepEqual(calls, []);
+});
+
+test("a plan without checkpoint does not ask before its first step", async () => {
+  await run({ steps: [list], progress: "Half done." });
+  assert.deepEqual(asked, []);
+});
+
 test("a confirm that throws fails the step before it runs", async () => {
   const report = await run(
     { steps: [{ call: "tasks.share", args: { id: "t1" } }] },

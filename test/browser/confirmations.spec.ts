@@ -238,3 +238,74 @@ test("many steps of one write capability ask once with the count", async ({
   await expect(page.locator(text)).toHaveText(["Update task t1", "3 items"]);
   expect(await inState(page, "confirmation")).toBe(true);
 });
+
+// Checkpoints (contract-plan.md in dicta-action-server, Checkpoint).
+
+function checkpoint(progress?: string) {
+  return {
+    type: "plan",
+    plan: {
+      steps: [{ call: "tasks.delete", args: { id: "t1" } }],
+      text: "Deleting the task",
+      checkpoint: true,
+      ...(progress === undefined ? {} : { progress }),
+    },
+  };
+}
+
+test("a checkpoint shows its progress, then the step's confirmation", async ({
+  page,
+}) => {
+  const bodies = await replies(
+    page,
+    checkpoint("Half done. Shall I go on?"),
+    done,
+  );
+  await openPage(page);
+  await submit(page, "delete it");
+  await expect(page.locator(text)).toHaveText("Half done. Shall I go on?");
+  expect(await inState(page, "confirmation")).toBe(true);
+  await expect(page.locator('[role="status"]')).toHaveText(
+    /Half done\. Shall I go on\?$/,
+  );
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.locator(text)).toHaveText("Delete task t1");
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect.poll(() => bodies.length).toBe(2);
+  expect(await deleted(page)).toEqual(["t1"]);
+});
+
+test("a checkpoint without a progress shows the checkpoint string", async ({
+  page,
+}) => {
+  await replies(page, checkpoint(), done);
+  await openPage(page);
+  await submit(page, "delete it");
+  await expect(page.locator(text)).toHaveText("Do you want to go on?");
+});
+
+test("strings override the checkpoint string", async ({ page }) => {
+  await replies(page, checkpoint(), done);
+  await openPage(page);
+  await page.evaluate(() =>
+    Object.assign(document.querySelector("dicta-action")!, {
+      strings: { checkpoint: "Weitermachen?" },
+    }),
+  );
+  await submit(page, "delete it");
+  await expect(page.locator(text)).toHaveText("Weitermachen?");
+});
+
+test("text does not answer a checkpoint", async ({ page }) => {
+  const bodies = await replies(page, checkpoint(), done);
+  await openPage(page);
+  await submit(page, "delete it");
+  await expect(page.locator(text)).toHaveText("Do you want to go on?");
+  await submit(page, "yes");
+  await expect(page.locator(`${notice} .text`)).toHaveText(
+    "Answer with the buttons",
+  );
+  expect(await inState(page, "confirmation")).toBe(true);
+  expect(await deleted(page)).toEqual([]);
+  expect(bodies.length).toBe(1);
+});

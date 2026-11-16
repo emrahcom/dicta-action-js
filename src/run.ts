@@ -181,8 +181,13 @@ async function confirmText({ capability, args }: Prepared) {
 
 // What the user is asked: for each item shown, the texts of its calls that
 // ask, and the number of items when not all are shown (contract-plan.md,
-// Confirmation).
-export type Confirmation = { items: string[][]; count?: number };
+// Confirmation). A checkpoint has the plan's progress as its one item, or no
+// item when the plan has none (contract-plan.md, Checkpoint).
+export type Confirmation = {
+  items: string[][];
+  count?: number;
+  checkpoint?: boolean;
+};
 
 // Asks the user; true is Continue, false is Cancel.
 type Ask = (confirmation: Confirmation) => Promise<boolean>;
@@ -310,6 +315,19 @@ export async function runPlan(
     const stopped = stop();
     if (stopped) {
       halt = stopHalt(number, stopped);
+      break;
+    }
+    // A checkpoint asks once, before its first step, ahead of the step's own
+    // confirmation (contract-plan.md, Checkpoint).
+    if (
+      i === 0 &&
+      plan.checkpoint === true &&
+      !(await ask({
+        items: plan.progress === undefined ? [] : [[plan.progress]],
+        checkpoint: true,
+      }))
+    ) {
+      halt = stopHalt(number, "cancelled");
       break;
     }
     try {

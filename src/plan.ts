@@ -8,6 +8,7 @@ import type { Schema } from "./module.ts";
 const MAX_STEPS = 50;
 const MAX_BYTES = 16 * 1024;
 const MAX_LABEL_CHARS = 200;
+const MAX_PROGRESS_CHARS = 200;
 
 export type CallStep = {
   call: string;
@@ -25,6 +26,8 @@ export type Plan = {
   steps: (CallStep | ForEachStep)[];
   text?: string;
   final?: boolean;
+  checkpoint?: boolean;
+  progress?: string;
 };
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -234,7 +237,7 @@ export function checkPlan(
   if (new TextEncoder().encode(JSON.stringify(plan)).length > MAX_BYTES) {
     throw new Error("a plan is at most 16 KB");
   }
-  onlyKeys(plan, ["steps", "text", "final"], "plan");
+  onlyKeys(plan, ["steps", "text", "final", "checkpoint", "progress"], "plan");
   if (plan.text !== undefined && typeof plan.text !== "string") {
     throw new Error("text must be a string");
   }
@@ -248,6 +251,18 @@ export function checkPlan(
   }
   if (plan.final !== undefined && typeof plan.final !== "boolean") {
     throw new Error("final must be true or false");
+  }
+  if (plan.checkpoint !== undefined && typeof plan.checkpoint !== "boolean") {
+    throw new Error("checkpoint must be true or false");
+  }
+  if (plan.progress !== undefined && typeof plan.progress !== "string") {
+    throw new Error("progress must be a string");
+  }
+  if (
+    typeof plan.progress === "string" &&
+    Array.from(plan.progress).length > MAX_PROGRESS_CHARS
+  ) {
+    throw new Error(`progress is longer than ${MAX_PROGRESS_CHARS} characters`);
   }
   if (!Array.isArray(plan.steps)) {
     throw new Error("steps must be an array");
