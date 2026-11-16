@@ -216,6 +216,11 @@ The runner follows `contract-plan.md` and builds the report of
 
 ## Storage
 
+Each time a plan and its report join a request's exchange, the element leaves
+out the large outputs of the plans before the last two (`contract-protocol.md`,
+Request body). So the exchange is the same in memory, in each round, in the
+saved request and in the history.
+
 The element keeps three entries in the tab's `sessionStorage`, as JSON:
 
 - `dicta-action-tab-id`: the tab id, 16 bytes from `crypto.getRandomValues()` in
@@ -230,7 +235,10 @@ The element keeps three entries in the tab's `sessionStorage`, as JSON:
 - `dicta-action-history`: the finished requests, oldest first, each with
   `requestId`, `time`, `text`, `outcome` and `exchange`. As many as
   `contract-protocol.md`, History allows; when storage is full, the oldest go
-  first, also to make room for the saved request.
+  first, also to make room for the saved request. Each entry is stored as
+  `dicta.getHistory` returns it: when its JSON is over 16 KB, its outputs are
+  replaced by their sizes before it is stored (`contract-capability.md`,
+  `dicta.getHistory`), so storage holds nothing the planner cannot read.
 
 When the element has its `server` and `module`, it looks for a saved request,
 takes it out and goes on or ends it (`contract-protocol.md`, Page changes). It
@@ -245,7 +253,8 @@ back/forward cache (`pageshow`).
 Built-in capabilities).
 
 `dicta.getHistory` reads `dicta-action-history` from session storage itself, so
-it does not depend on the `<dicta-action>` element.
+it does not depend on the `<dicta-action>` element. It returns the stored entry
+as it is (Storage), or only its size when it is still over 16 KB.
 
 ## Strings
 
