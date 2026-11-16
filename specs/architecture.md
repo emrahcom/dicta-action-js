@@ -302,7 +302,7 @@ The element meets WCAG 2.2 level AA.
   its Close, the focus goes back to the page element it came from into the
   element, usually the site's text field. If that one is gone, it goes to the
   `<dicta-action>` element itself (`tabindex="-1"`).
-- Progress, questions, confirmations and notices are announced through a status
+- Labels, questions, confirmations and notices are announced through a status
   region, which is separate from the visible parts, so hiding a part does not
   silence it. Each text empties the region and is written into it 100 ms later,
   so a screen reader sees a change. Texts that come within those 100 ms are
