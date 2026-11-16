@@ -1,10 +1,14 @@
-import { expect, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 import {
   ANNOUNCE_DELAY_MS,
+  finishStep,
+  holdRounds,
+  holdStep,
   openPage,
   pauseClock,
   replies,
   ROUND,
+  runs,
   submit,
 } from "./page.ts";
 
@@ -116,9 +120,13 @@ test("the working view shows and announces the plan's label", async ({
   await page.evaluate(() =>
     (window as unknown as { finish: () => void }).finish(),
   );
-  // While the report is sent, the working view has no label.
+  // While the report is sent, the working view shows Thinking, not announced.
   await expect.poll(() => rounds).toBe(2);
-  await expect(page.locator('[part~="label"]')).toHaveText("");
+  await expect(page.locator('[part~="label"]')).toHaveText("Thinking...");
+  await page.clock.runFor(ANNOUNCE_DELAY_MS);
+  await expect(page.locator('[role="status"]')).toHaveText(
+    "Working Listing the tasks",
+  );
 });
 
 test("a request goes through a plan, a question and done", async ({ page }) => {
@@ -140,3 +148,117 @@ test("a request goes through a plan, a question and done", async ({ page }) => {
     { question: "Which one?", answer: "Budget" },
   ]);
 });
+
+// The working view's label: Thinking, step texts and a forEach's count
+// (specs/architecture.md, Display).
+
+const label = '[part~="label"]';
+
+// Answers the first round with the plan and holds every later one.
+async function planThenHold(page: Page, plan: unknown) {
+  let rounds = 0;
+  await page.route(ROUND, (route) => {
+    rounds += 1;
+    if (rounds === 1) {
+      return route.fulfill({
+        json: { requestId: "r1", reply: { type: "plan", plan } },
+      });
+    }
+  });
+  return () => rounds;
+}
+
+// Makes tasks.delete wait for window.finish() on each call.
+async function holdDeletes(page: Page) {
+  await page.evaluate(() => {
+    const element = document.querySelector("dicta-action") as unknown as {
+      module: { capabilities: Record<string, { run: () => Promise<unknown> }> };
+    };
+    element.module.capabilities["tasks.delete"].run = () =>
+      new Promise((resolve) => {
+        (window as unknown as { finish: () => void }).finish = () =>
+          resolve({});
+      });
+  });
+}
+
+test("the label is Thinking while the server has not answered", async ({
+  page,
+}) => {
+  await holdRounds(page);
+  await openPage(page);
+  await submit(page, "a");
+  await expect(page.locator(label)).toHaveText("Thinking...");
+});
+
+test("strings override Thinking", async ({ page }) => {
+  await holdRounds(page);
+  await openPage(page);
+  await page.evaluate(() =>
+    Object.assign(document.querySelector("dicta-action")!, {
+      strings: { thinking: "Einen Moment..." },
+    }),
+  );
+  await submit(page, "a");
+  await expect(page.locator(label)).toHaveText("Einen Moment...");
+});
+
+test("a step's text replaces the label while it runs, unannounced", async ({
+  page,
+}) => {
+  const rounds = await planThenHold(page, {
+    steps: [
+      { call: "tasks.list", args: {}, text: "Reading the tasks" },
+      { call: "tasks.list", args: {} },
+    ],
+    text: "Listing the tasks",
+  });
+  await page.clock.install();
+  await openPage(page);
+  await pauseClock(page);
+  await holdStep(page, "tasks.list");
+  await submit(page, "a");
+  await expect(page.locator(label)).toHaveText("Reading the tasks");
+  await finishStep(page);
+  await expect.poll(() => runs(page)).toBe(2);
+  await expect(page.locator(label)).toHaveText("Listing the tasks");
+  await finishStep(page);
+  await expect.poll(rounds).toBe(2);
+  await expect(page.locator(label)).toHaveText("Thinking...");
+  await page.clock.runFor(ANNOUNCE_DELAY_MS);
+  await expect(page.locator('[role="status"]')).toHaveText(
+    "Working Listing the tasks",
+  );
+});
+
+for (const [name, text, shown] of [
+  ["with a text", "Deleting the tasks", "Deleting the tasks "],
+  ["without a text", undefined, ""],
+] as const) {
+  test(`a forEach ${name} shows its count as it goes`, async ({ page }) => {
+    const rounds = await planThenHold(page, {
+      steps: [
+        { call: "tasks.list", args: {} },
+        {
+          forEach: "$1",
+          do: [{ call: "tasks.delete", args: { id: "$item.id" } }],
+          ...(text === undefined ? {} : { text }),
+        },
+      ],
+    });
+    await openPage(page);
+    await holdDeletes(page);
+    await submit(page, "a");
+    await page.getByRole("button", { name: "Continue" }).click();
+    await expect(page.locator(label)).toHaveText(`${shown}0/2`);
+    await page.evaluate(() =>
+      (window as unknown as { finish: () => void }).finish(),
+    );
+    await expect(page.locator(label)).toHaveText(`${shown}1/2`);
+    await page.evaluate(() =>
+      (window as unknown as { finish: () => void }).finish(),
+    );
+    await expect.poll(rounds).toBe(2);
+    await expect(page.locator(label)).toHaveText("Thinking...");
+  });
+}

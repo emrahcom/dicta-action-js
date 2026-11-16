@@ -8,6 +8,7 @@ import {
   newProgress,
   reportSoFar,
   runPlan,
+  type Shown,
   type Stop,
 } from "../src/run.ts";
 
@@ -634,6 +635,27 @@ const deleteEach = {
   forEach: "$1",
   do: [{ call: "tasks.delete", args: { id: "$item.id" } }],
 };
+
+test("the runner shows each step and a forEach's count", async () => {
+  const shown: Shown[] = [];
+  calls.length = 0;
+  answer = true;
+  await runPlan(
+    { steps: [{ call: "tasks.list", args: {} }, deleteEach] },
+    confirmModule(2),
+    ask,
+    () => undefined,
+    newProgress(),
+    () => false,
+    (value) => shown.push(value),
+  );
+  assert.deepEqual(shown, [
+    { step: 1 },
+    { step: 2, done: 0, all: 2 },
+    { step: 2, done: 1, all: 2 },
+    { step: 2, done: 2, all: 2 },
+  ]);
+});
 
 test("a destructive forEach asks once with the first three items", async () => {
   await run(

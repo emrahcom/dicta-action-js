@@ -14,6 +14,7 @@ import {
   type Report,
   reportSoFar,
   runPlan,
+  type Shown,
   STOP_MESSAGES,
 } from "./run.ts";
 import { saveRequest, takeSaved } from "./saved.ts";
@@ -71,6 +72,8 @@ const STRINGS = {
   info: "New information",
   items: "{count} items",
   pageLoad: "Wait for the page to load",
+  // Shown only, while the element waits for the server.
+  thinking: "Thinking...",
   tooLongNotice: "The text is too long",
   useButtonsNotice: "Answer with the buttons",
   // Announced only, never shown.
@@ -468,7 +471,7 @@ export class DictaAction extends HTMLElement {
   // Sends the next round of the request and acts on its reply.
   async #round(request: Request) {
     request.phase = "waiting";
-    this.#showWorking();
+    this.#showWorking(this.#string("thinking"));
     let requestId: string;
     let reply: Reply;
     try {
@@ -577,6 +580,7 @@ export class DictaAction extends HTMLElement {
             }
             return this.#request === request && request.pageLoad === true;
           },
+          (shown) => this.#showStep(request, plan as Plan, shown),
         );
       }
     } catch (err) {
@@ -794,6 +798,23 @@ export class DictaAction extends HTMLElement {
       status,
       this.#buttons([this.#button("cancel", () => this.#cancel())]),
     ]);
+  }
+
+  // While a plan runs, the working view's label is the running step's text,
+  // or the plan's label without one, and a forEach's count, such as 40/80
+  // (specs/architecture.md, Display). It is shown only, never announced, and
+  // changed in place, so the focus stays where it is.
+  #showStep(request: Request, plan: Plan, shown: Shown) {
+    if (this.#request !== request || request.phase !== "running") {
+      return;
+    }
+    const text = plan.steps[shown.step - 1]?.text ?? plan.text ?? "";
+    const count =
+      shown.all === undefined ? "" : `${shown.done ?? 0}/${shown.all}`;
+    const label = this.#view.querySelector('[part~="label"]');
+    if (label) {
+      label.textContent = [text, count].filter((part) => part !== "").join(" ");
+    }
   }
 
   #showQuestion(request: Request, text: string, options: string[]) {

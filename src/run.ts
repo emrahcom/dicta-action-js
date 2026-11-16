@@ -261,6 +261,11 @@ export type Progress = {
   output?: unknown[][];
 };
 
+// What the working view shows while a plan runs: the top-level step that
+// runs, and in a forEach how many of all its items are done
+// (specs/architecture.md, Display).
+export type Shown = { step: number; done?: number; all?: number };
+
 export function newProgress(): Progress {
   return { step: 1, included: [] };
 }
@@ -298,6 +303,7 @@ export async function runPlan(
   stop: () => Stop | undefined,
   progress: Progress,
   pageLoad: () => boolean | Promise<boolean>,
+  show: (shown: Shown) => void = () => {},
 ): Promise<Report> {
   const outputs: unknown[] = [];
   const included = progress.included;
@@ -347,6 +353,7 @@ export async function runPlan(
           throw new Stopped();
         }
         progress.pageLoad = call.capability.pageLoad === true;
+        show({ step: number });
         outputs.push(await execute(call));
       } else {
         const items = resolve(step.forEach, { outputs });
@@ -400,6 +407,7 @@ export async function runPlan(
         if (step.includeOutput) {
           progress.output = output;
         }
+        show({ step: number, done: 0, all: items.length });
         for (const [k, item] of items.entries()) {
           const itemStopped = k > 0 ? stop() : undefined;
           if (itemStopped) {
@@ -454,6 +462,7 @@ export async function runPlan(
               throw new Stopped();
             }
           }
+          show({ step: number, done: k + 1, all: items.length });
         }
         outputs.push(output);
       }
