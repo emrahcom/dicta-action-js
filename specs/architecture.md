@@ -142,9 +142,10 @@ placed to fit the view:
   (`contract-plan.md`, Label), and the `pageLoad` text while the element waits
   for a page load, announced once when the wait starts. During a `forEach`, the
   label ends with the items done and all items, such as `40/80`, updated after
-  each item. The step text and the count are shown only. The indicator is a
-  small spinner drawn with CSS. When the user prefers reduced motion
-  (`prefers-reduced-motion`), it stands still.
+  each item. A step's text is announced once, when the step starts; the count is
+  shown only (Accessibility). The indicator is a small spinner drawn with CSS.
+  When the user prefers reduced motion (`prefers-reduced-motion`), it stands
+  still.
 - `question`: the question's text, its options as buttons and Cancel. Pressing
   an option answers with the option's text.
 - `confirmation`: only the texts from the module's `confirm` as plain text
@@ -312,6 +313,6 @@ The element meets WCAG 2.2 level AA.
   Its notice can take the focus, so the user moves to it to read the text.
 - A screen reader user hears every request from start to end, also where the
   screen shows little: the `working` string when a request starts or goes on in
-  a new page, the plan's label when it has one, and the `done` string for a done
-  without a text.
+  a new page, the plan's label when it has one, a step's text when the step
+  starts, and the `done` string for a done without a text.
 - All text and buttons have enough contrast.
