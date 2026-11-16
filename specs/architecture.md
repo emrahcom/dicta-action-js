@@ -138,10 +138,13 @@ placed to fit the view:
 - `working`, while the element waits for the server, runs a plan or waits for a
   page load: a progress indicator, a label and Cancel. The label is the
   `thinking` text while the element waits for the server, shown only, the
-  running plan's label when it has one, and the `pageLoad` text while the
-  element waits for a page load, announced once when the wait starts. The
-  indicator is a small spinner drawn with CSS. When the user prefers reduced
-  motion (`prefers-reduced-motion`), it stands still.
+  running step's text or, without one, the running plan's label
+  (`contract-plan.md`, Label), and the `pageLoad` text while the element waits
+  for a page load, announced once when the wait starts. During a `forEach`, the
+  label ends with the items done and all items, such as `40/80`, updated after
+  each item. Only the plan's label is announced, as before. The indicator is a
+  small spinner drawn with CSS. When the user prefers reduced motion
+  (`prefers-reduced-motion`), it stands still.
 - `question`: the question's text, its options as buttons and Cancel. Pressing
   an option answers with the option's text.
 - `confirmation`: only the texts from the module's `confirm` as plain text
