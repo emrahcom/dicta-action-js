@@ -136,11 +136,12 @@ While a request runs, from the submit on, each view has its own Cancel button,
 placed to fit the view:
 
 - `working`, while the element waits for the server, runs a plan or waits for a
-  page load: a progress indicator, a label and Cancel. The label is the running
-  plan's label when it has one, and the `pageLoad` text while the element waits
-  for a page load, announced once when the wait starts. The indicator is a small
-  spinner drawn with CSS. When the user prefers reduced motion
-  (`prefers-reduced-motion`), it stands still.
+  page load: a progress indicator, a label and Cancel. The label is the
+  `thinking` text while the element waits for the server, shown only, the
+  running plan's label when it has one, and the `pageLoad` text while the
+  element waits for a page load, announced once when the wait starts. The
+  indicator is a small spinner drawn with CSS. When the user prefers reduced
+  motion (`prefers-reduced-motion`), it stands still.
 - `question`: the question's text, its options as buttons and Cancel. Pressing
   an option answers with the option's text.
 - `confirmation`: only the texts from the module's `confirm` as plain text
@@ -262,6 +263,8 @@ for example with the site's own translations:
   number in place of `{count}`
 - `pageLoad`: "Wait for the page to load", the `working` view's label while the
   element waits for a page load (Display)
+- `thinking`: "Thinking...", the `working` view's label while the element waits
+  for the server (Display)
 - `tooLongNotice`: "The text is too long"
 - `useButtonsNotice`: "Answer with the buttons"
 - `working`: "Working", announced only, when a request starts or goes on in a
