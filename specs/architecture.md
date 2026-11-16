@@ -70,7 +70,7 @@ CSS parts let the integrator style or hide each part of the element:
 
 - `view`: the box that holds the view shown (Display).
 - `indicator`: the progress indicator.
-- `label`: the `working` view's label: the plan's label or the `pageLoad` text.
+- `label`: the `working` view's label (Display).
 - `text`: the text of a question or a confirmation.
 - `buttons`: the box that holds the buttons of a view or a notice, under the
   rest of it (Display).
