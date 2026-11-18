@@ -8,7 +8,7 @@ import type { Schema } from "./module.ts";
 const MAX_STEPS = 50;
 const MAX_BYTES = 16 * 1024;
 const MAX_LABEL_CHARS = 200;
-const MAX_PROGRESS_CHARS = 200;
+const MAX_PROGRESS_CHARS = 300;
 const MAX_STEP_TEXT_CHARS = 100;
 
 export type CallStep = {

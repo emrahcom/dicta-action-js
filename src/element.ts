@@ -818,6 +818,12 @@ export class DictaAction extends HTMLElement {
     if (label) {
       label.textContent = [text, count].filter((part) => part !== "").join(" ");
     }
+    // A step's own text is announced once, when the step starts; the count
+    // is shown only (specs/architecture.md, Accessibility).
+    const stepText = plan.steps[shown.step - 1]?.text;
+    if (stepText && !shown.done) {
+      this.#announce(stepText);
+    }
   }
 
   #showQuestion(request: Request, text: string, options: string[]) {

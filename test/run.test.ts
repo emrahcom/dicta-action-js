@@ -1192,7 +1192,7 @@ function planItem(report: Record<string, unknown>) {
 const small = "s".repeat(510); // 512 bytes as JSON
 const large = "l".repeat(511); // 513 bytes as JSON
 
-test("plans before the last two lose their outputs over 512 bytes", () => {
+test("plans before the last two move outputs over 512 bytes into tooLarge", () => {
   const exchange = [
     planItem({
       outputs: { 1: small, 2: large },
@@ -1208,11 +1208,11 @@ test("plans before the last two lose their outputs over 512 bytes", () => {
   assert.deepEqual(withoutOldOutputs(exchange), [
     planItem({
       outputs: { 1: small },
-      tooLarge: { 3: 99999 },
-      halt: { step: 4, code: "x", message: "m" },
+      tooLarge: { 2: 513, 3: 99999 },
+      halt: { step: 4, code: "x", message: "m", tooLarge: 517 },
     }),
     { question: "Which?", answer: "This" },
-    planItem({}),
+    planItem({ tooLarge: { 1: 513 } }),
     { added: "and more" },
     planItem({ outputs: { 1: large } }),
     planItem({ outputs: { 1: large } }),

@@ -170,15 +170,15 @@ test("getHistory fails with not_found for an unknown id", async () => {
   });
 });
 
-test("a request over 16 KB is stored and returned without outputs", async () => {
-  const big = "a".repeat(9000);
+test("a stored request lists every output over 512 bytes in tooLarge", async () => {
+  const big = "a".repeat(600);
   addHistory(
     entry(1, {
       exchange: [
         {
           plan: { steps: [] },
           report: {
-            outputs: { 1: big, 2: big },
+            outputs: { 1: big, 2: big, 5: { id: "t9" } },
             tooLarge: { 3: 5 },
             halt: { step: 4, code: "x", message: "m", outputs: [[big]] },
           },
@@ -194,10 +194,22 @@ test("a request over 16 KB is stored and returned without outputs", async () => 
     {
       plan: { steps: [] },
       report: {
-        tooLarge: { 1: 9002, 2: 9002, 3: 5 },
-        halt: { step: 4, code: "x", message: "m", tooLarge: 9006 },
+        outputs: { 5: { id: "t9" } },
+        tooLarge: { 1: 602, 2: 602, 3: 5 },
+        halt: { step: 4, code: "x", message: "m", tooLarge: 606 },
       },
     },
     { question: "Which?", answer: "This" },
   ]);
+});
+
+test("a stored request over 16 KB keeps its small outputs", async () => {
+  // 40 plans of about 500 bytes each, each with a small output.
+  const exchange = Array.from({ length: 40 }, (_, i) => ({
+    plan: { steps: [], text: "x".repeat(480) },
+    report: { outputs: { 1: { id: `t${i}` } } },
+  }));
+  addHistory(entry(1, { exchange }));
+  const result = (await get.run({ requestId: "r1" })) as HistoryEntry;
+  assert.deepEqual(result.exchange, exchange);
 });

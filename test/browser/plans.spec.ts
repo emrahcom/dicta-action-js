@@ -203,7 +203,7 @@ test("strings override Thinking", async ({ page }) => {
   await expect(page.locator(label)).toHaveText("Einen Moment...");
 });
 
-test("a step's text replaces the label while it runs, unannounced", async ({
+test("a step's text replaces the label and is announced once", async ({
   page,
 }) => {
   const rounds = await planThenHold(page, {
@@ -226,8 +226,9 @@ test("a step's text replaces the label while it runs, unannounced", async ({
   await expect.poll(rounds).toBe(2);
   await expect(page.locator(label)).toHaveText("Thinking...");
   await page.clock.runFor(ANNOUNCE_DELAY_MS);
+  // The step's text follows the plan's label; the second step has none.
   await expect(page.locator('[role="status"]')).toHaveText(
-    "Working Listing the tasks",
+    "Working Listing the tasks Reading the tasks",
   );
 });
 
@@ -299,7 +300,13 @@ test("plans before the last two keep only their small outputs", async ({
   await expect.poll(() => bodies.length).toBe(4);
   const full = { outputs: { 1: tasks, 2: [{ id: "t9" }] } };
   expect(bodies[3].exchange).toEqual([
-    { plan: plan.plan, report: { outputs: { 2: [{ id: "t9" }] } } },
+    {
+      plan: plan.plan,
+      report: {
+        outputs: { 2: [{ id: "t9" }] },
+        tooLarge: { 1: JSON.stringify(tasks).length },
+      },
+    },
     { plan: plan.plan, report: full },
     { plan: plan.plan, report: full },
   ]);

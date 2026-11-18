@@ -93,8 +93,8 @@ const VALID: [string, unknown][] = [
     },
   ],
   [
-    "a checkpoint with a progress of 200 characters",
-    { steps: [list], checkpoint: true, progress: "\u{1F600}".repeat(200) },
+    "a checkpoint with a progress of 300 characters",
+    { steps: [list], checkpoint: true, progress: "\u{1F600}".repeat(300) },
   ],
   [
     "a label of 200 characters",
@@ -226,9 +226,9 @@ const INVALID: [string, unknown, RegExp][] = [
     /progress must be a string/,
   ],
   [
-    "a progress of 201 characters",
-    { steps: [], progress: "x".repeat(201) },
-    /progress is longer than 200 characters/,
+    "a progress of 301 characters",
+    { steps: [], progress: "x".repeat(301) },
+    /progress is longer than 300 characters/,
   ],
   [
     "a label of 201 characters",
