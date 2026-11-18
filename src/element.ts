@@ -381,7 +381,6 @@ export class DictaAction extends HTMLElement {
         plan,
         report: reportSoFar(progress, "cancelled", STOP_MESSAGES.cancelled),
       });
-      request.exchange = withoutOldOutputs(request.exchange);
     }
     this.#store(request, { type: "cancelled" });
   }
@@ -805,22 +804,20 @@ export class DictaAction extends HTMLElement {
 
   // While a plan runs, the working view's label is the running step's text,
   // or the plan's label without one, and a forEach's count, such as 40/80
-  // (specs/architecture.md, Display). It is shown only, never announced, and
-  // changed in place, so the focus stays where it is.
+  // (specs/architecture.md, Display). The label is changed in place, so the
+  // focus stays where it is. A step's own text is announced once, when the
+  // step starts; the count is shown only (Accessibility).
   #showStep(request: Request, plan: Plan, shown: Shown) {
     if (this.#request !== request || request.phase !== "running") {
       return;
     }
-    const text = plan.steps[shown.step - 1]?.text ?? plan.text ?? "";
-    const count =
-      shown.all === undefined ? "" : `${shown.done ?? 0}/${shown.all}`;
+    const stepText = plan.steps[shown.step - 1].text;
+    const text = stepText ?? plan.text ?? "";
+    const count = shown.all === undefined ? "" : `${shown.done}/${shown.all}`;
     const label = this.#view.querySelector('[part~="label"]');
     if (label) {
       label.textContent = [text, count].filter((part) => part !== "").join(" ");
     }
-    // A step's own text is announced once, when the step starts; the count
-    // is shown only (specs/architecture.md, Accessibility).
-    const stepText = plan.steps[shown.step - 1]?.text;
     if (stepText && !shown.done) {
       this.#announce(stepText);
     }
