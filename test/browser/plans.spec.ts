@@ -311,3 +311,30 @@ test("plans before the last two keep only their small outputs", async ({
     { plan: plan.plan, report: full },
   ]);
 });
+
+test("a forEach announces its text once, not for each item", async ({
+  page,
+}) => {
+  const rounds = await planThenHold(page, {
+    steps: [
+      { call: "tasks.list", args: {} },
+      {
+        forEach: "$1",
+        do: [{ call: "tasks.delete", args: { id: "$item.id" } }],
+        text: "Deleting the tasks",
+      },
+    ],
+  });
+  await page.clock.install();
+  await openPage(page);
+  await pauseClock(page);
+  await submit(page, "a");
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect.poll(rounds).toBe(2);
+  await page.clock.runFor(ANNOUNCE_DELAY_MS);
+  // Working, the confirmation, then the step's text once: no count, and no
+  // repeat for the second item.
+  await expect(page.locator('[role="status"]')).toHaveText(
+    "Working Delete task t1 Delete task t2 Deleting the tasks",
+  );
+});

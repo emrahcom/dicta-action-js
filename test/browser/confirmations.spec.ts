@@ -3,6 +3,7 @@ import {
   ANNOUNCE_DELAY_MS,
   box,
   deleted,
+  history,
   holdStep,
   openPage,
   pauseClock,
@@ -306,6 +307,30 @@ test("text does not answer a checkpoint", async ({ page }) => {
     "Answer with the buttons",
   );
   expect(await inState(page, "confirmation")).toBe(true);
+  expect(await deleted(page)).toEqual([]);
+  expect(bodies.length).toBe(1);
+});
+
+test("Cancel at a checkpoint ends the request before its first step", async ({
+  page,
+}) => {
+  const asked = checkpoint("Half done. Shall I go on?");
+  const bodies = await replies(page, asked, done);
+  await openPage(page);
+  await submit(page, "delete it");
+  await expect(page.locator(text)).toHaveText("Half done. Shall I go on?");
+  await page.getByRole("button", { name: "Cancel" }).click();
+  await expect.poll(async () => (await history(page)).length).toBe(1);
+  const [entry] = await history(page);
+  expect(entry).toMatchObject({
+    outcome: { type: "cancelled" },
+    exchange: [
+      {
+        plan: asked.plan,
+        report: { halt: { step: 1, code: "cancelled" } },
+      },
+    ],
+  });
   expect(await deleted(page)).toEqual([]);
   expect(bodies.length).toBe(1);
 });
