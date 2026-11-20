@@ -4,17 +4,19 @@ import {
   box,
   holdRounds,
   holdStep,
+  inState,
+  LABEL,
+  NOTICE,
   openPage,
   pauseClock,
   replies,
   reply,
   ROUND,
+  STATUS,
   submit,
 } from "./page.ts";
 
 const view = '[part~="view"]';
-const notice = '[part~="notice"]';
-const status = '[role="status"]';
 
 test("importing the package defines the element", async ({ page }) => {
   await openPage(page);
@@ -60,11 +62,7 @@ test("while waiting, the working view shows the indicator and Cancel", async ({
   await submit(page, "a");
   await expect(page.locator('[part~="indicator"]')).toBeVisible();
   await expect(page.getByRole("button", { name: "Cancel" })).toBeVisible();
-  expect(
-    await page.evaluate(() =>
-      document.querySelector("dicta-action")?.matches(":state(working)"),
-    ),
-  ).toBe(true);
+  expect(await inState(page, "working")).toBe(true);
 });
 
 test("the working view and a notice have their button on its own line", async ({
@@ -79,9 +77,9 @@ test("the working view and a notice have their button on its own line", async ({
   await openPage(page);
   await holdStep(page, "tasks.list");
   await submit(page, "a");
-  await expect(page.locator('[part~="label"]')).toHaveText("Listing");
+  await expect(page.locator(LABEL)).toHaveText("Listing");
   const indicator = await box(page.locator('[part~="indicator"]'));
-  const label = await box(page.locator('[part~="label"]'));
+  const label = await box(page.locator(LABEL));
   const cancel = await box(page.locator('[part~="buttons"] [part~="cancel"]'));
   // The indicator and the label stay on one line, Cancel under them.
   expect(label.x).toBeGreaterThan(indicator.x);
@@ -95,8 +93,8 @@ test("a notice has Close on its own line under its text", async ({ page }) => {
   await reply(page, { type: "stop", text: "No." });
   await openPage(page);
   await submit(page, "a");
-  const text = await box(page.locator(`${notice} .text`));
-  const close = await box(page.locator(`${notice} [part~="buttons"] button`));
+  const text = await box(page.locator(`${NOTICE} .text`));
+  const close = await box(page.locator(`${NOTICE} [part~="buttons"] button`));
   expect(close.y).toBeGreaterThanOrEqual(text.y + text.height);
   expect(close.x).toBe(text.x);
 });
@@ -126,7 +124,7 @@ test("Cancel ends the request and a late response is ignored", async ({
   await page.waitForTimeout(200);
   await expect(page.locator(view)).toBeHidden();
   // A response that is not ignored would show its stop as a notice.
-  await expect(page.locator(notice)).toHaveCount(0);
+  await expect(page.locator(NOTICE)).toHaveCount(0);
 });
 
 test("a done with a text is a notice that stays", async ({ page }) => {
@@ -134,10 +132,10 @@ test("a done with a text is a notice that stays", async ({ page }) => {
   await reply(page, { type: "done", text: "Moved 2 tasks." });
   await openPage(page);
   await submit(page, "a");
-  await expect(page.locator(`${notice} .text`)).toHaveText("Moved 2 tasks.");
+  await expect(page.locator(`${NOTICE} .text`)).toHaveText("Moved 2 tasks.");
   await expect(page.locator(view)).toBeHidden();
   await page.clock.runFor(3_600_000);
-  await expect(page.locator(notice)).toBeVisible();
+  await expect(page.locator(NOTICE)).toBeVisible();
 });
 
 test("a done without a text shows nothing", async ({ page }) => {
@@ -145,7 +143,7 @@ test("a done without a text shows nothing", async ({ page }) => {
   await openPage(page);
   await submit(page, "a");
   await expect(page.locator(view)).toBeHidden();
-  await expect(page.locator(notice)).toBeHidden();
+  await expect(page.locator(NOTICE)).toBeHidden();
 });
 
 test("a stop is a notice that stays until a new request", async ({ page }) => {
@@ -158,18 +156,18 @@ test("a stop is a notice that stays until a new request", async ({ page }) => {
   );
   await openPage(page);
   await submit(page, "a");
-  await expect(page.locator(`${notice} .text`)).toHaveText(
+  await expect(page.locator(`${NOTICE} .text`)).toHaveText(
     "Not about this site.",
   );
   await expect(page.locator(view)).toBeHidden();
   await page.clock.runFor(3_600_000);
-  await expect(page.locator(notice)).toBeVisible();
+  await expect(page.locator(NOTICE)).toBeVisible();
   // The next request removes it; an info stays over a new request.
   await submit(page, "b");
-  await expect(page.locator(`${notice} .text`)).toHaveText("Help.");
+  await expect(page.locator(`${NOTICE} .text`)).toHaveText("Help.");
   await submit(page, "c");
   await expect(page.locator('[part~="indicator"]')).toHaveCount(0);
-  await expect(page.locator(`${notice} .text`)).toHaveText("Help.");
+  await expect(page.locator(`${NOTICE} .text`)).toHaveText("Help.");
 });
 
 test("an info keeps its paragraphs and stays until Close", async ({ page }) => {
@@ -178,23 +176,23 @@ test("an info keeps its paragraphs and stays until Close", async ({ page }) => {
   await openPage(page);
   await pauseClock(page);
   await submit(page, "a");
-  const text = page.locator(`${notice} .text`);
+  const text = page.locator(`${NOTICE} .text`);
   await expect(text).toHaveText("First.\n\nSecond.", { useInnerText: true });
   await expect(text).toHaveCSS("white-space", "pre-line");
   // Only the info string is announced, not the text.
   await page.clock.runFor(ANNOUNCE_DELAY_MS);
-  await expect(page.locator(status)).toHaveText("Working New information");
+  await expect(page.locator(STATUS)).toHaveText("Working New information");
   await page.clock.runFor(60_000);
-  await expect(page.locator(notice)).toBeVisible();
+  await expect(page.locator(NOTICE)).toBeVisible();
   await page.getByRole("button", { name: "Close" }).click();
-  await expect(page.locator(notice)).toHaveCount(0);
+  await expect(page.locator(NOTICE)).toHaveCount(0);
 });
 
 test("texts are shown as plain text", async ({ page }) => {
   await reply(page, { type: "stop", text: "<b>bold</b>" });
   await openPage(page);
   await submit(page, "a");
-  await expect(page.locator(`${notice} .text`)).toHaveText("<b>bold</b>");
+  await expect(page.locator(`${NOTICE} .text`)).toHaveText("<b>bold</b>");
 });
 
 test("at most three notices, never dropping an info", async ({ page }) => {
@@ -215,7 +213,7 @@ test("at most three notices, never dropping an info", async ({ page }) => {
   for (const text of ["x", "y", "z"]) {
     await submit(page, text);
   }
-  await expect(page.locator(`${notice} .text`)).toHaveText([
+  await expect(page.locator(`${NOTICE} .text`)).toHaveText([
     "Help.",
     "Answer with the buttons",
     "Answer with the buttons",
@@ -239,7 +237,7 @@ test("with three infos, a new info removes the oldest", async ({ page }) => {
     { type: "info", text: "Three." },
     { type: "info", text: "Four." },
   ]);
-  await expect(page.locator(`${notice} .text`)).toHaveText([
+  await expect(page.locator(`${NOTICE} .text`)).toHaveText([
     "Two.",
     "Three.",
     "Four.",
@@ -254,7 +252,7 @@ test("with three infos, a stop is shown as a fourth", async ({ page }) => {
     { type: "info", text: "Three." },
     { type: "stop", text: "No." },
   ]);
-  await expect(page.locator(`${notice} .text`)).toHaveText([
+  await expect(page.locator(`${NOTICE} .text`)).toHaveText([
     "One.",
     "Two.",
     "Three.",
@@ -262,7 +260,7 @@ test("with three infos, a stop is shown as a fourth", async ({ page }) => {
   ]);
   // It stays too.
   await page.clock.runFor(3_600_000);
-  await expect(page.locator(notice)).toHaveCount(4);
+  await expect(page.locator(NOTICE)).toHaveCount(4);
 });
 
 test("a new request removes that fourth, a new info the oldest info", async ({
@@ -275,7 +273,7 @@ test("a new request removes that fourth, a new info the oldest info", async ({
     { type: "stop", text: "No." },
     { type: "info", text: "Four." },
   ]);
-  await expect(page.locator(`${notice} .text`)).toHaveText([
+  await expect(page.locator(`${NOTICE} .text`)).toHaveText([
     "Two.",
     "Three.",
     "Four.",
@@ -292,9 +290,9 @@ test("a held text starts a request that removes the stop", async ({ page }) => {
     json: { requestId: "r1", reply: { type: "stop", text: "No." } },
   });
   await expect(page.locator('[part~="indicator"]')).toBeVisible();
-  await expect(page.locator(notice)).toHaveCount(0);
+  await expect(page.locator(NOTICE)).toHaveCount(0);
   // It is still announced.
-  await expect(page.locator('[role="status"]')).toContainText("No.");
+  await expect(page.locator(STATUS)).toContainText("No.");
 });
 
 test("an HTTP error shows the error view and logs the cause", async ({
@@ -307,7 +305,7 @@ test("an HTTP error shows the error view and logs the cause", async ({
   );
   await openPage(page);
   await submit(page, "a");
-  await expect(page.locator(`${notice} .text`)).toHaveText(
+  await expect(page.locator(`${NOTICE} .text`)).toHaveText(
     "Something went wrong",
   );
   await expect(page.locator(view)).toBeHidden();
@@ -330,7 +328,7 @@ test("strings override the element's own texts", async ({ page }) => {
     }),
   );
   await submit(page, "a");
-  await expect(page.locator(`${notice} .text`)).toHaveText("Fehler");
+  await expect(page.locator(`${NOTICE} .text`)).toHaveText("Fehler");
   await expect(page.getByRole("button", { name: "Schliessen" })).toBeVisible();
 });
 
@@ -365,9 +363,9 @@ test("the status region announces the outcome", async ({ page }) => {
   await openPage(page);
   await pauseClock(page);
   await submit(page, "a");
-  await expect(page.locator(notice)).toBeVisible();
+  await expect(page.locator(NOTICE)).toBeVisible();
   await page.clock.runFor(ANNOUNCE_DELAY_MS);
-  await expect(page.locator(status)).toHaveText("Working Not about this site.");
+  await expect(page.locator(STATUS)).toHaveText("Working Not about this site.");
 });
 
 test("the status region announces a notice", async ({ page }) => {
@@ -376,9 +374,9 @@ test("the status region announces a notice", async ({ page }) => {
   await openPage(page);
   await pauseClock(page);
   await submit(page, "a");
-  await expect(page.locator(notice)).toBeVisible();
+  await expect(page.locator(NOTICE)).toBeVisible();
   await page.clock.runFor(ANNOUNCE_DELAY_MS);
-  await expect(page.locator(status)).toHaveText("Working Moved 2 tasks.");
+  await expect(page.locator(STATUS)).toHaveText("Working Moved 2 tasks.");
 });
 
 test("the focus goes to the element when a stop ends the request", async ({
@@ -514,8 +512,8 @@ test("Close removes a notice at once", async ({ page }) => {
   await reply(page, { type: "stop", text: "No." });
   await openPage(page);
   await submit(page, "a");
-  await page.locator(notice).getByRole("button", { name: "Close" }).click();
-  await expect(page.locator(notice)).toHaveCount(0);
+  await page.locator(NOTICE).getByRole("button", { name: "Close" }).click();
+  await expect(page.locator(NOTICE)).toHaveCount(0);
 });
 
 test("Close on a stop notice gives the focus back to the text field", async ({
@@ -525,7 +523,7 @@ test("Close on a stop notice gives the focus back to the text field", async ({
   await openPage(page, "<input><dicta-action></dicta-action>");
   await page.locator("input").focus();
   await submit(page, "a");
-  await expect(page.locator(notice)).toBeVisible();
+  await expect(page.locator(NOTICE)).toBeVisible();
   // A stop's notice is no Tab stop: the next one is its Close.
   await page.keyboard.press("Tab");
   await expect(page.getByRole("button", { name: "Close" })).toBeFocused();

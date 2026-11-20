@@ -1,12 +1,16 @@
 // Opens the test server's page (server.ts), which loads the built module, puts
 // the given markup into its body and gives each <dicta-action> a small module
-// with tasks.list, tasks.get and tasks.delete
-// and, unless set, this page's origin as its server.
-// The server's responses are faked with reply().
+// with tasks.list, tasks.get and tasks.delete and, unless set, this page's
+// origin as its server. The server's responses are faked with reply().
 
 import type { Locator, Page, Route } from "@playwright/test";
 
 export const ROUND = "**/dicta-action/v1/round";
+
+// Parts of the element that several spec files look at.
+export const NOTICE = '[part~="notice"]';
+export const LABEL = '[part~="label"]';
+export const STATUS = '[role="status"]';
 
 export async function openPage(
   page: Page,
@@ -71,6 +75,15 @@ export async function openPage(
       });
     }
   }, body);
+}
+
+// Whether the element is in the given custom state, such as working.
+export function inState(page: Page, state: string) {
+  return page.evaluate(
+    (name) =>
+      document.querySelector("dicta-action")?.matches(`:state(${name})`),
+    state,
+  );
 }
 
 // Answers every round with the given reply.

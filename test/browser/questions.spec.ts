@@ -3,9 +3,11 @@ import {
   ANNOUNCE_DELAY_MS,
   box,
   holdRounds,
+  inState,
   openPage,
   pauseClock,
   replies,
+  STATUS,
   submit,
 } from "./page.ts";
 
@@ -14,14 +16,6 @@ const question = {
   text: "Which Friday?",
   options: ["This week", "Next week"],
 };
-
-function inState(page: import("@playwright/test").Page, state: string) {
-  return page.evaluate(
-    (name) =>
-      document.querySelector("dicta-action")?.matches(`:state(${name})`),
-    state,
-  );
-}
 
 test("a question shows its text, its options and Cancel", async ({ page }) => {
   await page.clock.install();
@@ -38,7 +32,7 @@ test("a question shows its text, its options and Cancel", async ({ page }) => {
   expect(await inState(page, "question")).toBe(true);
   // The options are announced after the question's text.
   await page.clock.runFor(ANNOUNCE_DELAY_MS);
-  await expect(page.locator('[role="status"]')).toHaveText(
+  await expect(page.locator(STATUS)).toHaveText(
     "Working Which Friday? This week Next week",
   );
 });

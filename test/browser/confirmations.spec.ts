@@ -1,27 +1,22 @@
-import { expect, type Page, test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import {
   ANNOUNCE_DELAY_MS,
   box,
   deleted,
   history,
   holdStep,
+  inState,
+  LABEL,
+  NOTICE,
   openPage,
   pauseClock,
   replies,
+  STATUS,
   submit,
 } from "./page.ts";
 
 const done = { type: "done" };
 const text = '[part~="text"]';
-const notice = '[part~="notice"]';
-
-function inState(page: Page, state: string) {
-  return page.evaluate(
-    (name) =>
-      document.querySelector("dicta-action")?.matches(`:state(${name})`),
-    state,
-  );
-}
 
 const deleteOne = {
   type: "plan",
@@ -41,10 +36,10 @@ test("a destructive step shows the confirmation view", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Continue" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Cancel" })).toBeVisible();
   // The confirmation shows only the module's words, not the plan's label.
-  await expect(page.locator('[part~="label"]')).toHaveCount(0);
+  await expect(page.locator(LABEL)).toHaveCount(0);
   expect(await inState(page, "confirmation")).toBe(true);
   await page.clock.runFor(ANNOUNCE_DELAY_MS);
-  await expect(page.locator('[role="status"]')).toHaveText(
+  await expect(page.locator(STATUS)).toHaveText(
     "Working Deleting the task Delete task t1",
   );
   expect(await deleted(page)).toEqual([]);
@@ -97,12 +92,10 @@ test("text during a confirmation is ignored with a notice", async ({
   await submit(page, "delete it");
   await expect(page.locator(text)).toHaveText("Delete task t1");
   await submit(page, "yes");
-  await expect(page.locator(`${notice} .text`)).toHaveText(
+  await expect(page.locator(`${NOTICE} .text`)).toHaveText(
     "Answer with the buttons",
   );
-  await expect(page.locator('[role="status"]')).toHaveText(
-    /Answer with the buttons$/,
-  );
+  await expect(page.locator(STATUS)).toHaveText(/Answer with the buttons$/);
   expect(await inState(page, "confirmation")).toBe(true);
   expect(await deleted(page)).toEqual([]);
   expect(bodies.length).toBe(1);
@@ -125,7 +118,7 @@ test("strings override the notice for text during a confirmation", async ({
   await submit(page, "delete it");
   await expect(page.locator(text)).toHaveText("Delete task t1");
   await submit(page, "ja");
-  await expect(page.locator(`${notice} .text`)).toHaveText(
+  await expect(page.locator(`${NOTICE} .text`)).toHaveText(
     "Bitte die Knoepfe nutzen",
   );
 });
@@ -209,7 +202,7 @@ test("the focus moves from Continue to the working view's Cancel", async ({
   await page.getByRole("button", { name: "Continue" }).focus();
   await page.keyboard.press("Enter");
   await expect(page.locator('[part~="indicator"]')).toBeVisible();
-  await expect(page.locator('[part~="label"]')).toHaveText("Deleting the task");
+  await expect(page.locator(LABEL)).toHaveText("Deleting the task");
   await expect(page.getByRole("button", { name: "Cancel" })).toBeFocused();
 });
 
@@ -266,9 +259,7 @@ test("a checkpoint shows its progress, then the step's confirmation", async ({
   await submit(page, "delete it");
   await expect(page.locator(text)).toHaveText("Half done. Shall I go on?");
   expect(await inState(page, "confirmation")).toBe(true);
-  await expect(page.locator('[role="status"]')).toHaveText(
-    /Half done\. Shall I go on\?$/,
-  );
+  await expect(page.locator(STATUS)).toHaveText(/Half done\. Shall I go on\?$/);
   await page.getByRole("button", { name: "Continue" }).click();
   await expect(page.locator(text)).toHaveText("Delete task t1");
   await page.getByRole("button", { name: "Continue" }).click();
@@ -303,7 +294,7 @@ test("text does not answer a checkpoint", async ({ page }) => {
   await submit(page, "delete it");
   await expect(page.locator(text)).toHaveText("Do you want to go on?");
   await submit(page, "yes");
-  await expect(page.locator(`${notice} .text`)).toHaveText(
+  await expect(page.locator(`${NOTICE} .text`)).toHaveText(
     "Answer with the buttons",
   );
   expect(await inState(page, "confirmation")).toBe(true);

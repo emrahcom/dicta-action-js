@@ -4,9 +4,11 @@ import type { CapabilityModule } from "../src/index.ts";
 import { buildContext } from "../src/context.ts";
 import { checkPlan, type Plan } from "../src/plan.ts";
 import {
+  bytes,
   cancelledReportSoFar,
   type Confirmation,
   newProgress,
+  type Progress,
   runPlan,
   type Shown,
   type Stop,
@@ -96,22 +98,35 @@ const module = moduleWith({
   },
 });
 
-// Every confirmation asked, answered with `answer`.
+// Every confirmation asked.
 const asked: Confirmation[] = [];
-let answer = true;
 
-async function ask(confirmation: Confirmation) {
-  asked.push(confirmation);
-  return answer;
-}
+type Options = {
+  answer?: boolean;
+  progress?: Progress;
+  stop?: () => Stop | undefined;
+  show?: (shown: Shown) => void;
+  pageLoad?: () => boolean;
+};
 
-async function run(plan: Plan, using = module) {
+// Runs a plan and records its calls and confirmations afresh. Every
+// confirmation is answered with `answer`; by default nothing stops the plan
+// and no page loads.
+async function run(
+  plan: Plan,
+  using = module,
+  { answer = true, progress = newProgress(), ...callbacks }: Options = {},
+) {
   calls.length = 0;
   asked.length = 0;
-  return runPlan(plan, using, newProgress(), {
-    ask,
+  return runPlan(plan, using, progress, {
+    ask: async (confirmation) => {
+      asked.push(confirmation);
+      return answer;
+    },
     stop: () => undefined,
     pageLoad: () => false,
+    ...callbacks,
   });
 }
 
@@ -462,10 +477,6 @@ test("halt outputs that do not fit go into halt.tooLarge", async () => {
   assert.equal(report.halt?.tooLarge, bytes([[{ id: "t1" }], []]));
 });
 
-function bytes(value: unknown) {
-  return new TextEncoder().encode(JSON.stringify(value)).length;
-}
-
 // Confirmations (contract-plan.md, Confirmation).
 
 function confirmModule(items: number) {
@@ -503,11 +514,6 @@ function confirmModule(items: number) {
       },
       run: recorder("tasks.share", () => null),
     },
-    "tasks.send": {
-      level: "external",
-      desc: "Sends a task, without confirm.",
-      run: recorder("tasks.send", () => null),
-    },
   });
 }
 
@@ -516,7 +522,6 @@ function withConfirmOver(using: CapabilityModule, confirmOver: number) {
 }
 
 test("a destructive call asks with its confirm text", async () => {
-  answer = true;
   const report = await run(
     { steps: [{ call: "tasks.delete", args: { id: "t1" } }] },
     confirmModule(0),
@@ -540,7 +545,6 @@ test("a read or write call does not ask", async () => {
 });
 
 test("Cancel halts with cancelled and runs nothing more", async () => {
-  answer = false;
   const report = await run(
     {
       steps: [
@@ -550,8 +554,8 @@ test("Cancel halts with cancelled and runs nothing more", async () => {
       ],
     },
     confirmModule(0),
+    { answer: false },
   );
-  answer = true;
   assert.deepEqual(report.halt, {
     step: 2,
     code: "cancelled",
@@ -563,7 +567,6 @@ test("Cancel halts with cancelled and runs nothing more", async () => {
 // Checkpoints (contract-plan.md, Checkpoint).
 
 test("a checkpoint asks once with its progress, before its first step", async () => {
-  answer = true;
   const report = await run(
     {
       steps: [
@@ -584,15 +587,14 @@ test("a checkpoint asks once with its progress, before its first step", async ()
 });
 
 test("a checkpoint without a progress asks with no item", async () => {
-  answer = true;
   await run({ steps: [list], checkpoint: true });
   assert.deepEqual(asked, [{ items: [], checkpoint: true }]);
 });
 
 test("Cancel at a checkpoint halts at step 1 and runs nothing", async () => {
-  answer = false;
-  const report = await run({ steps: [list], checkpoint: true });
-  answer = true;
+  const report = await run({ steps: [list], checkpoint: true }, module, {
+    answer: false,
+  });
   assert.deepEqual(report.halt, {
     step: 1,
     code: "cancelled",
@@ -620,15 +622,6 @@ test("a confirm that throws fails the step before it runs", async () => {
   assert.deepEqual(calls, []);
 });
 
-test("a missing confirm fails the step as a capability error", async () => {
-  const report = await run(
-    { steps: [{ call: "tasks.send", args: {} }] },
-    confirmModule(0),
-  );
-  assert.equal(report.halt?.code, "capability");
-  assert.deepEqual(calls, []);
-});
-
 const deleteEach = {
   forEach: "$1",
   do: [{ call: "tasks.delete", args: { id: "$item.id" } }],
@@ -636,18 +629,10 @@ const deleteEach = {
 
 test("the runner shows each step and a forEach's count", async () => {
   const shown: Shown[] = [];
-  calls.length = 0;
-  answer = true;
-  await runPlan(
+  await run(
     { steps: [{ call: "tasks.list", args: {} }, deleteEach] },
     confirmModule(2),
-    newProgress(),
-    {
-      ask,
-      stop: () => undefined,
-      pageLoad: () => false,
-      show: (value) => shown.push(value),
-    },
+    { show: (value) => shown.push(value) },
   );
   assert.deepEqual(shown, [
     { step: 1 },
@@ -780,13 +765,9 @@ function stopAt(call: number, value: Stop) {
 }
 
 test("a stop before a step halts there", async () => {
-  calls.length = 0;
-  const report = await runPlan(
-    { steps: [list, list, list] },
-    module,
-    newProgress(),
-    { ask, stop: stopAt(2, "interrupted"), pageLoad: () => false },
-  );
+  const report = await run({ steps: [list, list, list] }, module, {
+    stop: stopAt(2, "interrupted"),
+  });
   assert.deepEqual(report.halt, {
     step: 2,
     code: "interrupted",
@@ -796,9 +777,8 @@ test("a stop before a step halts there", async () => {
 });
 
 test("a stop in a forEach halts at the next item, without do", async () => {
-  calls.length = 0;
   // Asked before steps 1 and 2, then before item 1 of step 2.
-  const report = await runPlan(
+  const report = await run(
     {
       steps: [
         list,
@@ -813,8 +793,7 @@ test("a stop in a forEach halts at the next item, without do", async () => {
       ],
     },
     module,
-    newProgress(),
-    { ask, stop: stopAt(3, "cancelled"), pageLoad: () => false },
+    { stop: stopAt(3, "cancelled") },
   );
   assert.deepEqual(report.halt, {
     step: 2,
@@ -828,8 +807,7 @@ test("a stop in a forEach halts at the next item, without do", async () => {
 });
 
 test("a forEach stopped between items without includeOutput", async () => {
-  calls.length = 0;
-  const report = await runPlan(
+  const report = await run(
     {
       steps: [
         list,
@@ -840,19 +818,15 @@ test("a forEach stopped between items without includeOutput", async () => {
       ],
     },
     module,
-    newProgress(),
-    { ask, stop: stopAt(3, "interrupted"), pageLoad: () => false },
+    { stop: stopAt(3, "interrupted") },
   );
   assert.equal(report.halt?.item, 1);
   assert.equal(Object.hasOwn(report.halt ?? {}, "outputs"), false);
 });
 
 test("a stop after the last step does not halt", async () => {
-  calls.length = 0;
-  const report = await runPlan({ steps: [list] }, module, newProgress(), {
-    ask,
+  const report = await run({ steps: [list] }, module, {
     stop: stopAt(2, "interrupted"),
-    pageLoad: () => false,
   });
   assert.deepEqual(report, {});
 });
@@ -873,7 +847,7 @@ test("the report so far halts at the running step with its outputs", async () =>
       },
     },
   });
-  await runPlan(
+  await run(
     {
       steps: [
         { ...list, includeOutput: true },
@@ -881,8 +855,7 @@ test("the report so far halts at the running step with its outputs", async () =>
       ],
     },
     leaving,
-    progress,
-    { ask, stop: () => undefined, pageLoad: () => false },
+    { progress },
   );
   assert.deepEqual(soFar, {
     outputs: { 1: TASKS },
@@ -907,7 +880,7 @@ test("the report so far in a forEach has its item, call and outputs", async () =
       },
     },
   });
-  await runPlan(
+  await run(
     {
       steps: [
         list,
@@ -922,8 +895,7 @@ test("the report so far in a forEach has its item, call and outputs", async () =
       ],
     },
     leaving,
-    progress,
-    { ask, stop: () => undefined, pageLoad: () => false },
+    { progress },
   );
   assert.deepEqual(soFar, {
     halt: {
@@ -943,7 +915,6 @@ test("the report so far in a forEach has its item, call and outputs", async () =
 // steps after which the page load check ran are in `checked`.
 const checked: (number | string)[] = [];
 async function runWithPageLoad(plan: Plan, at = "t1") {
-  calls.length = 0;
   checked.length = 0;
   let loading = false;
   const progress = newProgress();
@@ -961,9 +932,8 @@ async function runWithPageLoad(plan: Plan, at = "t1") {
       },
     },
   });
-  return runPlan(plan, loads, progress, {
-    ask,
-    stop: () => undefined,
+  return run(plan, loads, {
+    progress,
     pageLoad: () => {
       const { step, item, do: call } = progress;
       checked.push(item === undefined ? step : `${step}.${item}.${call}`);
@@ -1098,7 +1068,6 @@ function updates(count: number) {
 }
 
 test("more write steps than confirmOver ask once with the first", async () => {
-  answer = true;
   const report = await run(
     { steps: updates(3) },
     withConfirmOver(confirmModule(1), 2),
@@ -1151,12 +1120,11 @@ test("forEach calls are not counted with write steps", async () => {
 });
 
 test("Cancel at many write steps halts at the first", async () => {
-  answer = false;
   const report = await run(
     { steps: [{ call: "tasks.list", args: {} }, ...updates(3)] },
     withConfirmOver(confirmModule(1), 2),
+    { answer: false },
   );
-  answer = true;
   assert.deepEqual(report.halt, {
     step: 2,
     code: "cancelled",

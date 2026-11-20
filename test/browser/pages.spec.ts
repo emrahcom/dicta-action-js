@@ -3,9 +3,12 @@ import {
   history,
   holdRounds,
   holdStep,
+  LABEL,
+  NOTICE,
   replies,
   ROUND,
   runs,
+  STATUS,
   submit,
 } from "./page.ts";
 
@@ -291,7 +294,7 @@ test("a failed round while leaving is an error when the page stays", async ({
   // A page load that starts and is called off, as by a "leave page?" prompt.
   await page.evaluate(() => dispatchEvent(new Event("beforeunload")));
   await submit(page, "a");
-  await expect(page.locator('[part~="notice"] .text')).toHaveText(
+  await expect(page.locator(`${NOTICE} .text`)).toHaveText(
     "Something went wrong",
   );
 });
@@ -330,14 +333,10 @@ test("after Stay at the leave prompt text is ignored until Cancel", async ({
   await submit(page, "go");
   await expect.poll(() => bodies.length).toBe(1);
   // The working view's label says why text is ignored.
-  await expect(page.locator('[part~="label"]')).toHaveText(
-    "Wait for the page to load",
-  );
-  await expect(page.locator('[role="status"]')).toContainText(
-    "Wait for the page to load",
-  );
+  await expect(page.locator(LABEL)).toHaveText("Wait for the page to load");
+  await expect(page.locator(STATUS)).toContainText("Wait for the page to load");
   await submit(page, "and more");
-  await expect(page.locator('[part~="notice"]')).toHaveCount(0);
+  await expect(page.locator(NOTICE)).toHaveCount(0);
   // The plan does not go on and no round is sent.
   await page.waitForTimeout(300);
   expect(bodies.length).toBe(1);
@@ -368,9 +367,7 @@ test("Cancel after Stay keeps the text added before the page load", async ({
   await page.evaluate(() =>
     (window as unknown as { release: () => void }).release(),
   );
-  await expect(page.locator('[part~="label"]')).toHaveText(
-    "Wait for the page to load",
-  );
+  await expect(page.locator(LABEL)).toHaveText("Wait for the page to load");
   await page.getByRole("button", { name: "Cancel" }).click();
   await expect(page.locator('[part~="view"]')).toBeHidden();
   expect(bodies.length).toBe(1);

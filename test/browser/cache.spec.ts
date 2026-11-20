@@ -1,5 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
-import { history, openPage, replies, ROUND, submit } from "./page.ts";
+import { history, NOTICE, openPage, replies, ROUND, submit } from "./page.ts";
 
 function fire(page: Page, type: string, persisted = false) {
   return page.evaluate(
@@ -30,9 +30,9 @@ test("pagehide hides the notices", async ({ page }) => {
   await openPage(page);
   await submit(page, "a");
   await submit(page, "b");
-  await expect(page.locator('[part~="notice"]')).toHaveCount(2);
+  await expect(page.locator(NOTICE)).toHaveCount(2);
   await fire(page, "pagehide");
-  await expect(page.locator('[part~="notice"]')).toHaveCount(0);
+  await expect(page.locator(NOTICE)).toHaveCount(0);
 });
 
 test("after pagehide a failed round is an error at once", async ({ page }) => {
@@ -42,7 +42,7 @@ test("after pagehide a failed round is an error at once", async ({ page }) => {
   await fire(page, "pagehide");
   await submit(page, "a");
   // Well under the one second a leaving page waits.
-  await expect(page.locator('[part~="notice"] .text')).toHaveText(
+  await expect(page.locator(`${NOTICE} .text`)).toHaveText(
     "Something went wrong",
     { timeout: 500 },
   );

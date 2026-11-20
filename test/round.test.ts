@@ -123,10 +123,9 @@ test("a second 401 is an error", async () => {
     module,
     async () => "t",
   );
-  await assert.rejects(
-    client.send({ text: "a", exchange: [] }),
-    (err) => err instanceof Error && err.message === "HTTP 401: bad token",
-  );
+  await assert.rejects(client.send({ text: "a", exchange: [] }), {
+    message: "HTTP 401: bad token",
+  });
 });
 
 test("another HTTP error is an error with the server's error", async () => {
@@ -136,11 +135,9 @@ test("another HTTP error is an error with the server's error", async () => {
     module,
     async () => "t",
   );
-  await assert.rejects(
-    client.send({ text: "a", exchange: [] }),
-    (err) =>
-      err instanceof Error && err.message === "HTTP 400: context: too large",
-  );
+  await assert.rejects(client.send({ text: "a", exchange: [] }), {
+    message: "HTTP 400: context: too large",
+  });
   assert.equal(calls.length, 1);
 });
 
@@ -155,12 +152,9 @@ test("an HTTP error without a JSON body is an error", async () => {
 test("a network failure is an error, with no retry", async () => {
   const calls = fakeFetch(new TypeError("Failed to fetch"));
   const client = new RoundClient("https://example.com", module);
-  await assert.rejects(
-    client.send({ text: "a", exchange: [] }),
-    (err) =>
-      err instanceof Error &&
-      err.message === "network failure: Failed to fetch",
-  );
+  await assert.rejects(client.send({ text: "a", exchange: [] }), {
+    message: "network failure: Failed to fetch",
+  });
   assert.equal(calls.length, 1);
 });
 
@@ -191,11 +185,9 @@ test("no response after 60 seconds is an error", async () => {
 test("an unknown reply type is an error", async () => {
   fakeFetch(json(200, { requestId: "r1", reply: { type: "dance" } }));
   const client = new RoundClient("https://example.com", module);
-  await assert.rejects(
-    client.send({ text: "a", exchange: [] }),
-    (err) =>
-      err instanceof Error && err.message === "unknown reply type: dance",
-  );
+  await assert.rejects(client.send({ text: "a", exchange: [] }), {
+    message: "unknown reply type: dance",
+  });
 });
 
 test("a response without a reply is an error", async () => {
@@ -211,11 +203,9 @@ test("getToken throwing is an error", async () => {
   const client = new RoundClient("https://example.com", module, async () => {
     throw new Error("backend down");
   });
-  await assert.rejects(
-    client.send({ text: "a", exchange: [] }),
-    (err) =>
-      err instanceof Error && err.message === "getToken failed: backend down",
-  );
+  await assert.rejects(client.send({ text: "a", exchange: [] }), {
+    message: "getToken failed: backend down",
+  });
   assert.equal(calls.length, 0);
 });
 
@@ -231,11 +221,9 @@ test("state.run throwing is an error", async () => {
     },
   };
   const client = new RoundClient("https://example.com", broken);
-  await assert.rejects(
-    client.send({ text: "a", exchange: [] }),
-    (err) =>
-      err instanceof Error && err.message === "state.run failed: no page",
-  );
+  await assert.rejects(client.send({ text: "a", exchange: [] }), {
+    message: "state.run failed: no page",
+  });
   assert.equal(calls.length, 0);
 });
 
@@ -246,23 +234,27 @@ function at(iso: string, offsetMinutes: number) {
   return date;
 }
 
-test("the time has a positive offset", () => {
-  assert.equal(
-    localTime(at("2026-10-28T14:20:05Z", 60)),
+for (const [name, iso, offset, time] of [
+  [
+    "a positive offset",
+    "2026-10-28T14:20:05Z",
+    60,
     "2026-10-28T15:20:05+01:00",
-  );
-});
-
-test("the time has a negative offset", () => {
-  assert.equal(
-    localTime(at("2026-10-28T01:20:05Z", -210)),
+  ],
+  [
+    "a negative offset",
+    "2026-10-28T01:20:05Z",
+    -210,
     "2026-10-27T21:50:05-03:30",
-  );
-});
-
-test("the time has a zero offset as numbers, never Z", () => {
-  assert.equal(
-    localTime(at("2026-10-28T14:20:05.900Z", 0)),
+  ],
+  [
+    "a zero offset as numbers, never Z",
+    "2026-10-28T14:20:05.900Z",
+    0,
     "2026-10-28T14:20:05+00:00",
-  );
-});
+  ],
+] as const) {
+  test(`the time has ${name}`, () => {
+    assert.equal(localTime(at(iso, offset)), time);
+  });
+}
