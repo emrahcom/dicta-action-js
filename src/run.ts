@@ -15,6 +15,35 @@ const MAX_ITEMS = 100;
 const MAX_OUTPUT_BYTES = 16 * 1024;
 const MAX_MESSAGE_CHARS = 200;
 
+// The plans whose reports keep every output, counted from the end, and the
+// largest output an older report, or a finished request, keeps
+// (contract-protocol.md, Request body).
+const KEPT_PLANS = 2;
+const MAX_SMALL_OUTPUT_BYTES = 512;
+
+// The client's own halt codes (contract-protocol.md, Report).
+const CLIENT_CODES = new Set([
+  "capability",
+  "reference",
+  "limit",
+  "invalid",
+  "cancelled",
+  "interrupted",
+  "navigated",
+]);
+
+const STOP_MESSAGES: Record<Stop, string> = {
+  interrupted: "The user added text",
+  cancelled: "Cancelled",
+};
+
+// A page load started during a step: nothing after it runs
+// (contract-protocol.md, Page changes).
+const NAVIGATED_MESSAGE = "The page changed";
+
+const SHOWN_ITEMS = 3;
+const DEFAULT_CONFIRM_OVER = 10;
+
 type Halt = {
   step?: number;
   code: string;
@@ -30,6 +59,50 @@ export type Report = {
   tooLarge?: Record<string, number>;
   halt?: Halt;
 };
+
+// The outputs a reference can use: those of the earlier steps, and the item
+// inside the do of a forEach.
+type Scope = { outputs: unknown[]; item?: unknown };
+
+// A call with its capability and its filled-in, checked arguments.
+type Prepared = { capability: Capability; args: Record<string, unknown> };
+
+// What the user is asked: for each item shown, the texts of its calls that
+// ask, and the number of items when not all are shown (contract-plan.md,
+// Confirmation). A checkpoint has the plan's progress as its one item, or no
+// item when the plan has none (contract-plan.md, Checkpoint).
+export type Confirmation = {
+  items: string[][];
+  count?: number;
+  checkpoint?: boolean;
+};
+
+// Asks the user; true is Continue, false is Cancel.
+type Ask = (confirmation: Confirmation) => Promise<boolean>;
+
+// Why a plan stops early at the next step or item: added text or cancel
+// (contract-protocol.md, Added text and cancel).
+export type Stop = "interrupted" | "cancelled";
+
+// Where a running plan is, for a page change in the middle of it
+// (contract-protocol.md, Page changes): the step, and in a forEach the item
+// and call; and the outputs so far.
+export type Progress = {
+  step: number;
+  item?: number;
+  do?: number;
+  // Whether the running or last call may load a page; only then is a page load
+  // looked for (contract-capability.md, Page changes).
+  pageLoad?: boolean;
+  included: [number, unknown][];
+  // The forEach's output so far, when its step has includeOutput.
+  output?: unknown[][];
+};
+
+// What the working view shows while a plan runs: the top-level step that
+// runs, and in a forEach how many of all its items are done
+// (specs/architecture.md, Display).
+export type Shown = { step: number; done?: number; all?: number };
 
 // A failure that halts the plan, with its code (contract-protocol.md, Report).
 class Failure extends Error {
@@ -49,6 +122,11 @@ function isContainer(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
+// The message of a thrown value, which may be any value.
+export function errorMessage(err: unknown) {
+  return err instanceof Error ? err.message : String(err);
+}
+
 // Cuts a message to 200 characters (Unicode code points).
 export function cut(message: string) {
   const chars = Array.from(message);
@@ -57,15 +135,9 @@ export function cut(message: string) {
     : message;
 }
 
-export function bytes(value: unknown) {
+function bytes(value: unknown) {
   return new TextEncoder().encode(JSON.stringify(value) ?? "null").length;
 }
-
-// The plans whose reports keep every output, counted from the end, and the
-// largest output an older report, or a finished request, keeps
-// (contract-protocol.md, Request body).
-const KEPT_PLANS = 2;
-const MAX_SMALL_OUTPUT_BYTES = 512;
 
 // The item with each output over 512 bytes moved into its report's tooLarge,
 // or a halt output into halt.tooLarge, with its size. Everything else stays.
@@ -113,10 +185,6 @@ export function withoutOldOutputs(exchange: unknown[]): unknown[] {
   );
 }
 
-// The outputs a reference can use: those of the earlier steps, and the item
-// inside the do of a forEach.
-type Scope = { outputs: unknown[]; item?: unknown };
-
 function resolve(ref: string, scope: Scope): unknown {
   const [head = "", ...path] = ref.slice(1).split(".");
   let value = head === "item" ? scope.item : scope.outputs[Number(head) - 1];
@@ -153,9 +221,6 @@ function fill(value: unknown, scope: Scope): unknown {
   return value;
 }
 
-// A call with its capability and its filled-in, checked arguments.
-type Prepared = { capability: Capability; args: Record<string, unknown> };
-
 function capabilityOf(step: CallStep, module: CapabilityModule) {
   if (!Object.hasOwn(module.capabilities, step.call)) {
     throw new Failure("capability", `no capability ${step.call}`);
@@ -178,17 +243,6 @@ function prepare(
   return { capability, args };
 }
 
-// The client's own halt codes (contract-protocol.md, Report).
-const CLIENT_CODES = new Set([
-  "capability",
-  "reference",
-  "limit",
-  "invalid",
-  "cancelled",
-  "interrupted",
-  "navigated",
-]);
-
 // A capability's own string code is reported, unless it is one of the
 // client's own; otherwise `capability` (contract-capability.md, Errors).
 function capabilityFailure(err: unknown) {
@@ -198,8 +252,7 @@ function capabilityFailure(err: unknown) {
     !CLIENT_CODES.has(err.code)
       ? err.code
       : "capability";
-  const message = err instanceof Error ? err.message : String(err);
-  return new Failure(code, message);
+  return new Failure(code, errorMessage(err));
 }
 
 // Runs a call and turns its output into JSON at once, so references and the
@@ -231,41 +284,12 @@ async function confirmText({ capability, args }: Prepared) {
   }
 }
 
-// What the user is asked: for each item shown, the texts of its calls that
-// ask, and the number of items when not all are shown (contract-plan.md,
-// Confirmation). A checkpoint has the plan's progress as its one item, or no
-// item when the plan has none (contract-plan.md, Checkpoint).
-export type Confirmation = {
-  items: string[][];
-  count?: number;
-  checkpoint?: boolean;
-};
-
-// Asks the user; true is Continue, false is Cancel.
-type Ask = (confirmation: Confirmation) => Promise<boolean>;
-
 // The plan stops early, by added text or cancel; its halt is already set.
 class Stopped extends Error {}
-
-// Why a plan stops early at the next step or item: added text or cancel
-// (contract-protocol.md, Added text and cancel).
-export type Stop = "interrupted" | "cancelled";
-
-export const STOP_MESSAGES: Record<Stop, string> = {
-  interrupted: "The user added text",
-  cancelled: "Cancelled",
-};
 
 function stopHalt(step: number, code: Stop): Halt {
   return { step, code, message: STOP_MESSAGES[code] };
 }
-
-// A page load started during a step: nothing after it runs
-// (contract-protocol.md, Page changes).
-const NAVIGATED_MESSAGE = "The page changed";
-
-const SHOWN_ITEMS = 3;
-const DEFAULT_CONFIRM_OVER = 10;
 
 // Whether a call asks: a destructive or external one always, a write one in a
 // forEach of more items than confirmOver.
@@ -298,38 +322,18 @@ function repeatedWrites(
   return counts;
 }
 
-// Where a running plan is, for a page change in the middle of it
-// (contract-protocol.md, Page changes): the step, and in a forEach the item
-// and call; and the outputs so far.
-export type Progress = {
-  step: number;
-  item?: number;
-  do?: number;
-  // Whether the running or last call may load a page; only then is a page load
-  // looked for (contract-capability.md, Page changes).
-  pageLoad?: boolean;
-  included: [number, unknown][];
-  // The forEach's output so far, when its step has includeOutput.
-  output?: unknown[][];
-};
-
-// What the working view shows while a plan runs: the top-level step that
-// runs, and in a forEach how many of all its items are done
-// (specs/architecture.md, Display).
-export type Shown = { step: number; done?: number; all?: number };
-
 export function newProgress(): Progress {
   return { step: 1, included: [] };
 }
 
-// The report of a plan stopped where it is now, with the halt `code`, for a
-// page left while a step runs: that step may or may not have finished.
-export function reportSoFar(
-  progress: Progress,
-  code: string,
-  message: string,
-): Report {
-  const halt: Halt = { step: progress.step, code, message };
+// The report of a plan stopped where it is now, with the halt `cancelled`, for
+// a page left while a step runs: that step may or may not have finished.
+export function cancelledReportSoFar(progress: Progress): Report {
+  const halt: Halt = {
+    step: progress.step,
+    code: "cancelled",
+    message: STOP_MESSAGES.cancelled,
+  };
   if (progress.item !== undefined) {
     halt.item = progress.item;
     halt.do = progress.do;

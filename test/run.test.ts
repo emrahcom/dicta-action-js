@@ -4,9 +4,9 @@ import type { CapabilityModule } from "../src/index.ts";
 import { buildContext } from "../src/context.ts";
 import { checkPlan, type Plan } from "../src/plan.ts";
 import {
+  cancelledReportSoFar,
   type Confirmation,
   newProgress,
-  reportSoFar,
   runPlan,
   type Shown,
   type Stop,
@@ -878,7 +878,7 @@ test("the report so far halts at the running step with its outputs", async () =>
       level: "write",
       desc: "Opens a page.",
       run: async () => {
-        soFar = reportSoFar(progress, "navigated", "The page changed");
+        soFar = cancelledReportSoFar(progress);
         return null;
       },
     },
@@ -898,7 +898,7 @@ test("the report so far halts at the running step with its outputs", async () =>
   );
   assert.deepEqual(soFar, {
     outputs: { 1: TASKS },
-    halt: { step: 2, code: "navigated", message: "The page changed" },
+    halt: { step: 2, code: "cancelled", message: "Cancelled" },
   });
 });
 
@@ -913,7 +913,7 @@ test("the report so far in a forEach has its item, call and outputs", async () =
       args: { type: "object", properties: { id: { type: "string" } } },
       run: async (args) => {
         if (args.id === "t2") {
-          soFar = reportSoFar(progress, "navigated", "The page changed");
+          soFar = cancelledReportSoFar(progress);
         }
         return { id: args.id };
       },
@@ -942,8 +942,8 @@ test("the report so far in a forEach has its item, call and outputs", async () =
   assert.deepEqual(soFar, {
     halt: {
       step: 2,
-      code: "navigated",
-      message: "The page changed",
+      code: "cancelled",
+      message: "Cancelled",
       item: 1,
       do: 1,
       outputs: [[{ id: "t1" }, { id: "t1" }], [{ id: "t2" }]],

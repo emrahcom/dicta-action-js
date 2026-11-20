@@ -6,8 +6,17 @@ import { cut, withSmallOutputs } from "./run.ts";
 const KEY = "dicta-action-history";
 const MAX_REQUESTS = 20;
 
+// How a request ended (contract-protocol.md, History).
+export const OUTCOME_TYPES = [
+  "done",
+  "stop",
+  "info",
+  "cancelled",
+  "error",
+] as const;
+
 export type Outcome = {
-  type: "done" | "stop" | "info" | "cancelled" | "error";
+  type: (typeof OUTCOME_TYPES)[number];
   text?: string;
 };
 

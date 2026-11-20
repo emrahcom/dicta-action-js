@@ -4,6 +4,7 @@
 import { buildContext, type SiteContext } from "./context.ts";
 import { shortHistory } from "./history.ts";
 import type { CapabilityModule } from "./module.ts";
+import { errorMessage } from "./run.ts";
 import { tabId } from "./tab.ts";
 
 export type Reply =
@@ -41,10 +42,6 @@ export function localTime(date: Date): string {
   );
 }
 
-function message(err: unknown) {
-  return err instanceof Error ? err.message : String(err);
-}
-
 export class RoundClient {
   readonly #url: string;
   readonly #module: CapabilityModule;
@@ -77,7 +74,7 @@ export class RoundClient {
     try {
       state = await this.#module.state.run();
     } catch (err) {
-      throw new Error(`state.run failed: ${message(err)}`);
+      throw new Error(`state.run failed: ${errorMessage(err)}`);
     }
     const body = JSON.stringify({
       tabId: tabId(),
@@ -104,7 +101,7 @@ export class RoundClient {
       try {
         this.#token = await this.#getToken();
       } catch (err) {
-        throw new Error(`getToken failed: ${message(err)}`);
+        throw new Error(`getToken failed: ${errorMessage(err)}`);
       }
     }
     return this.#token;
@@ -137,7 +134,7 @@ export class RoundClient {
       if (controller.signal.aborted) {
         throw new Error("no response after 60 seconds");
       }
-      throw new Error(`network failure: ${message(err)}`);
+      throw new Error(`network failure: ${errorMessage(err)}`);
     } finally {
       clearTimeout(timer);
     }

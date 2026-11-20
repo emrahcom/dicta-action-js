@@ -7,15 +7,15 @@ import { checkPlan, type Plan } from "./plan.ts";
 import { addHistory, type Outcome } from "./history.ts";
 import { localTime, type Reply, RoundClient } from "./round.ts";
 import {
+  cancelledReportSoFar,
   type Confirmation,
   cut,
+  errorMessage,
   newProgress,
   type Progress,
   type Report,
-  reportSoFar,
   runPlan,
   type Shown,
-  STOP_MESSAGES,
   withoutOldOutputs,
 } from "./run.ts";
 import { saveRequest, takeSaved } from "./saved.ts";
@@ -222,19 +222,17 @@ export class DictaAction extends HTMLElement {
   // The page element the focus came from into the element, to go back to.
   #focusFrom: HTMLElement | undefined;
 
-  static observedAttributes = ["server"];
-
   #module: CapabilityModule | undefined;
 
-  // Setting the module may let a saved request go on (#resume).
-  get module() {
-    return this.#module;
-  }
+  // The URLs of downloads, since Firefox fires a second navigate for each,
+  // without its downloadRequest.
+  #downloads = new Set<string>();
 
-  set module(module: CapabilityModule | undefined) {
-    this.#module = module;
-    this.#resume();
-  }
+  // Browsers abort a pending round when a page load starts, after
+  // beforeunload and before pagehide; that is a page change, not an error.
+  #leaving = false;
+
+  static observedAttributes = ["server"];
 
   constructor() {
     super();
@@ -287,9 +285,19 @@ export class DictaAction extends HTMLElement {
     navigationApi()?.removeEventListener("navigate", this.#onNavigate);
   }
 
-  // The URLs of downloads, since Firefox fires a second navigate for each,
-  // without its downloadRequest.
-  #downloads = new Set<string>();
+  attributeChangedCallback() {
+    this.#resume();
+  }
+
+  // Setting the module may let a saved request go on (#resume).
+  get module() {
+    return this.#module;
+  }
+
+  set module(module: CapabilityModule | undefined) {
+    this.#module = module;
+    this.#resume();
+  }
 
   // A page load, to another document, that starts while a plan runs, during or
   // just after a call that may load a page (specs/architecture.md, Plan
@@ -317,17 +325,9 @@ export class DictaAction extends HTMLElement {
     }
   };
 
-  // Browsers abort a pending round when a page load starts, after
-  // beforeunload and before pagehide; that is a page change, not an error.
-  #leaving = false;
-
   #onBeforeUnload = () => {
     this.#leaving = true;
   };
-
-  attributeChangedCallback() {
-    this.#resume();
-  }
 
   #onPageHide = () => {
     // The page load has happened: a later failed round is an error at once.
@@ -379,7 +379,7 @@ export class DictaAction extends HTMLElement {
       // A report not sent yet goes into the history too.
       request.exchange.push({
         plan,
-        report: reportSoFar(progress, "cancelled", STOP_MESSAGES.cancelled),
+        report: cancelledReportSoFar(progress),
       });
     }
     this.#store(request, { type: "cancelled" });
@@ -562,38 +562,40 @@ export class DictaAction extends HTMLElement {
         }
         request.plan = plan;
         request.progress = newProgress();
-        report = await runPlan(
-          plan as Plan,
-          client.module,
-          (confirmation) => this.#ask(request, confirmation, text),
-          () => {
-            if (this.#request !== request) {
-              return "cancelled";
-            }
-            return request.added.length > 0 ? "interrupted" : undefined;
-          },
-          request.progress,
-          async () => {
-            // A seen page load is not waited on, or the new page may come
-            // first. WebKit fires navigate for location.reload() a task later.
-            if (request.pageLoad !== true) {
-              await new Promise((resolve) => setTimeout(resolve, 0));
-            }
-            return this.#request === request && request.pageLoad === true;
-          },
-          (shown) => this.#showStep(request, plan as Plan, shown),
-        );
+        try {
+          report = await runPlan(
+            plan as Plan,
+            client.module,
+            (confirmation) => this.#ask(request, confirmation, text),
+            () => {
+              if (this.#request !== request) {
+                return "cancelled";
+              }
+              return request.added.length > 0 ? "interrupted" : undefined;
+            },
+            request.progress,
+            async () => {
+              // A seen page load is not waited on, or the new page may come
+              // first. WebKit fires navigate for location.reload() a task
+              // later.
+              if (request.pageLoad !== true) {
+                await new Promise((resolve) => setTimeout(resolve, 0));
+              }
+              return this.#request === request && request.pageLoad === true;
+            },
+            (shown) => this.#showStep(request, plan as Plan, shown),
+          );
+        } finally {
+          request.plan = undefined;
+          request.progress = undefined;
+        }
       }
     } catch (err) {
-      request.plan = undefined;
-      request.progress = undefined;
       if (this.#request === request) {
         this.#fail(request, err);
       }
       return;
     }
-    request.plan = undefined;
-    request.progress = undefined;
     request.exchange.push({ plan, report });
     request.exchange = withoutOldOutputs(request.exchange);
     if (this.#request !== request) {
@@ -623,8 +625,7 @@ export class DictaAction extends HTMLElement {
       checkPlan(plan, context);
       return undefined;
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      return { halt: { code: "invalid", message: cut(message) } };
+      return { halt: { code: "invalid", message: cut(errorMessage(err)) } };
     }
   }
 
@@ -664,9 +665,7 @@ export class DictaAction extends HTMLElement {
     this.#request = undefined;
     this.#store(request, { type: "error" });
     // The message as text, since browsers print an error object differently.
-    console.error(
-      `dicta-action: ${err instanceof Error ? err.message : String(err)}`,
-    );
+    console.error(`dicta-action: ${errorMessage(err)}`);
     this.#hideView();
     this.#addNotice(this.#string("errorNotice"));
   }
@@ -739,22 +738,15 @@ export class DictaAction extends HTMLElement {
           ),
         );
       }
-      const elements = texts.map((text) => {
-        const element = document.createElement("div");
-        element.className = "text";
-        element.part.add("text");
-        element.textContent = text;
-        return element;
-      });
       this.#setView("confirmation", [
-        ...elements,
+        ...texts.map((text) => this.#text(text)),
         this.#buttons([
-          this.#button("continue", () => {
+          this.#button("continue", this.#string("continue"), () => {
             request.phase = "running";
             this.#showWorking(label);
             resolve(true);
           }),
-          this.#button("cancel", () => {
+          this.#button("cancel", this.#string("cancel"), () => {
             this.#cancel();
             resolve(false);
           }),
@@ -764,13 +756,24 @@ export class DictaAction extends HTMLElement {
     });
   }
 
-  #button(name: "continue" | "cancel" | "close", onClick: () => void) {
+  #button(part: string, label: string, onClick: () => void) {
     const button = document.createElement("button");
     button.type = "button";
-    button.part.add(name);
-    button.textContent = this.#string(name);
+    button.part.add(part);
+    button.textContent = label;
     button.addEventListener("click", onClick);
     return button;
+  }
+
+  // The text of a view or a notice; only a view's text is the part text.
+  #text(text: string, part = true) {
+    const element = document.createElement("div");
+    element.className = "text";
+    if (part) {
+      element.part.add("text");
+    }
+    element.textContent = text;
+    return element;
   }
 
   // The box under the rest of a view or a notice that holds its buttons. In a
@@ -798,7 +801,9 @@ export class DictaAction extends HTMLElement {
     status.append(indicator, label);
     this.#setView("working", [
       status,
-      this.#buttons([this.#button("cancel", () => this.#cancel())]),
+      this.#buttons([
+        this.#button("cancel", this.#string("cancel"), () => this.#cancel()),
+      ]),
     ]);
   }
 
@@ -824,23 +829,17 @@ export class DictaAction extends HTMLElement {
   }
 
   #showQuestion(request: Request, text: string, options: string[]) {
-    const element = document.createElement("div");
-    element.className = "text";
-    element.part.add("text");
-    element.textContent = text;
-    const buttons = options.map((option) => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.part.add("option");
-      button.textContent = option;
-      button.addEventListener("click", () => this.#answer(request, option));
-      return button;
-    });
+    const buttons = options.map((option) =>
+      this.#button("option", option, () => this.#answer(request, option)),
+    );
     // Cancel is in the same column, after the options.
     this.#setView("question", [
-      element,
+      this.#text(text),
       this.#buttons(
-        [...buttons, this.#button("cancel", () => this.#cancel())],
+        [
+          ...buttons,
+          this.#button("cancel", this.#string("cancel"), () => this.#cancel()),
+        ],
         true,
       ),
     ]);
@@ -851,9 +850,7 @@ export class DictaAction extends HTMLElement {
   // Shows a view in place of the one shown. When the focus was in the old
   // view, it moves to the new view's Cancel.
   #setView(view: View, children: HTMLElement[]) {
-    const hadFocus = this.#view.contains(
-      this.shadowRoot?.activeElement ?? null,
-    );
+    const hadFocus = this.#hasFocus(this.#view);
     this.#view.replaceChildren(...children);
     this.#view.hidden = false;
     this.#internals.states.clear();
@@ -866,15 +863,18 @@ export class DictaAction extends HTMLElement {
   // Hides the view. When the focus was in it, it goes back to the page element
   // it came from, or to the element itself when that one is gone.
   #hideView() {
-    const hadFocus = this.#view.contains(
-      this.shadowRoot?.activeElement ?? null,
-    );
+    const hadFocus = this.#hasFocus(this.#view);
     this.#view.hidden = true;
     this.#view.replaceChildren();
     this.#internals.states.clear();
     if (hadFocus) {
       this.#returnFocus();
     }
+  }
+
+  // Whether the focus is in an element of the shadow root.
+  #hasFocus(element: HTMLElement) {
+    return element.contains(this.shadowRoot?.activeElement ?? null);
   }
 
   // Gives the focus back to the page element it came from into the element,
@@ -901,13 +901,14 @@ export class DictaAction extends HTMLElement {
     if (info) {
       notice.tabIndex = 0;
     }
-    const element = document.createElement("div");
-    element.className = "text";
-    element.textContent = text;
     // Every notice can be closed at once.
     notice.append(
-      element,
-      this.#buttons([this.#button("close", () => this.#removeNotice(notice))]),
+      this.#text(text, false),
+      this.#buttons([
+        this.#button("close", this.#string("close"), () =>
+          this.#removeNotice(notice),
+        ),
+      ]),
     );
     if (info) {
       this.#infos.add(notice);
@@ -920,10 +921,12 @@ export class DictaAction extends HTMLElement {
     // shown as a fourth.
     const shown = Array.from(this.#notices.children) as HTMLElement[];
     while (shown.length >= MAX_NOTICES) {
-      const index = shown.findIndex((element) => !this.#infos.has(element));
-      const oldest = index >= 0 ? index : info ? 0 : -1;
+      let oldest = shown.findIndex((element) => !this.#infos.has(element));
       if (oldest < 0) {
-        break;
+        if (!info) {
+          break;
+        }
+        oldest = 0;
       }
       this.#removeNotice(shown.splice(oldest, 1)[0]);
     }
@@ -944,7 +947,7 @@ export class DictaAction extends HTMLElement {
     if (!notice.isConnected) {
       return;
     }
-    const hadFocus = notice.contains(this.shadowRoot?.activeElement ?? null);
+    const hadFocus = this.#hasFocus(notice);
     notice.remove();
     if (hadFocus) {
       this.#returnFocus();

@@ -33,8 +33,26 @@ export type Plan = {
   progress?: string;
 };
 
+// Characters are Unicode code points, as for every text (contract-plan.md,
+// Limits).
+function chars(value: string) {
+  return Array.from(value).length;
+}
+
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function checkOptionalText(value: unknown, max: number, path: string) {
+  if (value === undefined) {
+    return;
+  }
+  if (typeof value !== "string") {
+    throw new Error(`${path} must be a string`);
+  }
+  if (chars(value) > max) {
+    throw new Error(`${path} is longer than ${max} characters`);
+  }
 }
 
 function onlyKeys(
@@ -205,17 +223,7 @@ function checkTopLevel(step: Record<string, unknown>, path: string) {
   ) {
     throw new Error(`${path}.includeOutput must be true or false`);
   }
-  if (step.text !== undefined && typeof step.text !== "string") {
-    throw new Error(`${path}.text must be a string`);
-  }
-  if (
-    typeof step.text === "string" &&
-    Array.from(step.text).length > MAX_STEP_TEXT_CHARS
-  ) {
-    throw new Error(
-      `${path}.text is longer than ${MAX_STEP_TEXT_CHARS} characters`,
-    );
-  }
+  checkOptionalText(step.text, MAX_STEP_TEXT_CHARS, `${path}.text`);
 }
 
 function checkCall(
@@ -253,35 +261,17 @@ export function checkPlan(
     throw new Error("the plan must be an object");
   }
   if (new TextEncoder().encode(JSON.stringify(plan)).length > MAX_BYTES) {
-    throw new Error("a plan is at most 16 KB");
+    throw new Error(`a plan is at most ${MAX_BYTES / 1024} KB`);
   }
   onlyKeys(plan, ["steps", "text", "final", "checkpoint", "progress"], "plan");
-  if (plan.text !== undefined && typeof plan.text !== "string") {
-    throw new Error("text must be a string");
-  }
-  // Characters are Unicode code points, as for every text (contract-plan.md,
-  // Limits).
-  if (
-    typeof plan.text === "string" &&
-    Array.from(plan.text).length > MAX_LABEL_CHARS
-  ) {
-    throw new Error(`text is longer than ${MAX_LABEL_CHARS} characters`);
-  }
+  checkOptionalText(plan.text, MAX_LABEL_CHARS, "text");
   if (plan.final !== undefined && typeof plan.final !== "boolean") {
     throw new Error("final must be true or false");
   }
   if (plan.checkpoint !== undefined && typeof plan.checkpoint !== "boolean") {
     throw new Error("checkpoint must be true or false");
   }
-  if (plan.progress !== undefined && typeof plan.progress !== "string") {
-    throw new Error("progress must be a string");
-  }
-  if (
-    typeof plan.progress === "string" &&
-    Array.from(plan.progress).length > MAX_PROGRESS_CHARS
-  ) {
-    throw new Error(`progress is longer than ${MAX_PROGRESS_CHARS} characters`);
-  }
+  checkOptionalText(plan.progress, MAX_PROGRESS_CHARS, "progress");
   if (!Array.isArray(plan.steps)) {
     throw new Error("steps must be an array");
   }
