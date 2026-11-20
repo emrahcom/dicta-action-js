@@ -1,7 +1,8 @@
 // The history: the finished requests of the browser tab, kept in its session
 // storage (specs/architecture.md, Storage; contract-protocol.md, History).
 
-import { cut, withSmallOutputs } from "./run.ts";
+import { withSmallOutputs } from "./exchange.ts";
+import { cut } from "./run.ts";
 
 const KEY = "dicta-action-history";
 const MAX_REQUESTS = 20;

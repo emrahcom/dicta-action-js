@@ -10,8 +10,8 @@ import {
   runPlan,
   type Shown,
   type Stop,
-  withoutOldOutputs,
 } from "../src/run.ts";
+import { withoutOldOutputs } from "../src/exchange.ts";
 
 type Args = Record<string, unknown>;
 
@@ -108,14 +108,11 @@ async function ask(confirmation: Confirmation) {
 async function run(plan: Plan, using = module) {
   calls.length = 0;
   asked.length = 0;
-  return runPlan(
-    plan,
-    using,
+  return runPlan(plan, using, newProgress(), {
     ask,
-    () => undefined,
-    newProgress(),
-    () => false,
-  );
+    stop: () => undefined,
+    pageLoad: () => false,
+  });
 }
 
 const list = { call: "tasks.list", args: {} };
@@ -644,11 +641,13 @@ test("the runner shows each step and a forEach's count", async () => {
   await runPlan(
     { steps: [{ call: "tasks.list", args: {} }, deleteEach] },
     confirmModule(2),
-    ask,
-    () => undefined,
     newProgress(),
-    () => false,
-    (value) => shown.push(value),
+    {
+      ask,
+      stop: () => undefined,
+      pageLoad: () => false,
+      show: (value) => shown.push(value),
+    },
   );
   assert.deepEqual(shown, [
     { step: 1 },
@@ -785,10 +784,8 @@ test("a stop before a step halts there", async () => {
   const report = await runPlan(
     { steps: [list, list, list] },
     module,
-    ask,
-    stopAt(2, "interrupted"),
     newProgress(),
-    () => false,
+    { ask, stop: stopAt(2, "interrupted"), pageLoad: () => false },
   );
   assert.deepEqual(report.halt, {
     step: 2,
@@ -816,10 +813,8 @@ test("a stop in a forEach halts at the next item, without do", async () => {
       ],
     },
     module,
-    ask,
-    stopAt(3, "cancelled"),
     newProgress(),
-    () => false,
+    { ask, stop: stopAt(3, "cancelled"), pageLoad: () => false },
   );
   assert.deepEqual(report.halt, {
     step: 2,
@@ -845,10 +840,8 @@ test("a forEach stopped between items without includeOutput", async () => {
       ],
     },
     module,
-    ask,
-    stopAt(3, "interrupted"),
     newProgress(),
-    () => false,
+    { ask, stop: stopAt(3, "interrupted"), pageLoad: () => false },
   );
   assert.equal(report.halt?.item, 1);
   assert.equal(Object.hasOwn(report.halt ?? {}, "outputs"), false);
@@ -856,14 +849,11 @@ test("a forEach stopped between items without includeOutput", async () => {
 
 test("a stop after the last step does not halt", async () => {
   calls.length = 0;
-  const report = await runPlan(
-    { steps: [list] },
-    module,
+  const report = await runPlan({ steps: [list] }, module, newProgress(), {
     ask,
-    stopAt(2, "interrupted"),
-    newProgress(),
-    () => false,
-  );
+    stop: stopAt(2, "interrupted"),
+    pageLoad: () => false,
+  });
   assert.deepEqual(report, {});
 });
 
@@ -891,10 +881,8 @@ test("the report so far halts at the running step with its outputs", async () =>
       ],
     },
     leaving,
-    ask,
-    () => undefined,
     progress,
-    () => false,
+    { ask, stop: () => undefined, pageLoad: () => false },
   );
   assert.deepEqual(soFar, {
     outputs: { 1: TASKS },
@@ -934,10 +922,8 @@ test("the report so far in a forEach has its item, call and outputs", async () =
       ],
     },
     leaving,
-    ask,
-    () => undefined,
     progress,
-    () => false,
+    { ask, stop: () => undefined, pageLoad: () => false },
   );
   assert.deepEqual(soFar, {
     halt: {
@@ -975,18 +961,15 @@ async function runWithPageLoad(plan: Plan, at = "t1") {
       },
     },
   });
-  return runPlan(
-    plan,
-    loads,
+  return runPlan(plan, loads, progress, {
     ask,
-    () => undefined,
-    progress,
-    () => {
+    stop: () => undefined,
+    pageLoad: () => {
       const { step, item, do: call } = progress;
       checked.push(item === undefined ? step : `${step}.${item}.${call}`);
       return loading;
     },
-  );
+  });
 }
 
 const navigated = { code: "navigated", message: "The page changed" };

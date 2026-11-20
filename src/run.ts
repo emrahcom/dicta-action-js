@@ -15,12 +15,6 @@ const MAX_ITEMS = 100;
 const MAX_OUTPUT_BYTES = 16 * 1024;
 const MAX_MESSAGE_CHARS = 200;
 
-// The plans whose reports keep every output, counted from the end, and the
-// largest output an older report, or a finished request, keeps
-// (contract-protocol.md, Request body).
-const KEPT_PLANS = 2;
-const MAX_SMALL_OUTPUT_BYTES = 512;
-
 // The client's own halt codes (contract-protocol.md, Report).
 const CLIENT_CODES = new Set([
   "capability",
@@ -135,54 +129,8 @@ export function cut(message: string) {
     : message;
 }
 
-function bytes(value: unknown) {
+export function bytes(value: unknown) {
   return new TextEncoder().encode(JSON.stringify(value) ?? "null").length;
-}
-
-// The item with each output over 512 bytes moved into its report's tooLarge,
-// or a halt output into halt.tooLarge, with its size. Everything else stays.
-export function withSmallOutputs(item: unknown): unknown {
-  const { report } = item as { report?: Report };
-  if (report === undefined) {
-    return item;
-  }
-  const copy: Report = { ...report };
-  if (copy.outputs !== undefined) {
-    const outputs: Record<string, unknown> = {};
-    for (const [step, output] of Object.entries(copy.outputs)) {
-      const size = bytes(output);
-      if (size <= MAX_SMALL_OUTPUT_BYTES) {
-        outputs[step] = output;
-      } else {
-        copy.tooLarge = { ...copy.tooLarge, [step]: size };
-      }
-    }
-    if (Object.keys(outputs).length > 0) {
-      copy.outputs = outputs;
-    } else {
-      delete copy.outputs;
-    }
-  }
-  if (copy.halt?.outputs !== undefined) {
-    const size = bytes(copy.halt.outputs);
-    if (size > MAX_SMALL_OUTPUT_BYTES) {
-      const { outputs: _, ...halt } = copy.halt;
-      copy.halt = { ...halt, tooLarge: size };
-    }
-  }
-  return { ...(item as object), report: copy };
-}
-
-// The exchange with the large outputs of every plan but the last two moved
-// into tooLarge (contract-protocol.md, Request body).
-export function withoutOldOutputs(exchange: unknown[]): unknown[] {
-  const plans = exchange.filter(
-    (item) => (item as { report?: unknown }).report !== undefined,
-  );
-  const old = new Set(plans.slice(0, -KEPT_PLANS));
-  return exchange.map((item) =>
-    old.has(item) ? withSmallOutputs(item) : item,
-  );
 }
 
 function resolve(ref: string, scope: Scope): unknown {
@@ -284,9 +232,6 @@ async function confirmText({ capability, args }: Prepared) {
   }
 }
 
-// The plan stops early, by added text or cancel; its halt is already set.
-class Stopped extends Error {}
-
 function stopHalt(step: number, code: Stop): Halt {
   return { step, code, message: STOP_MESSAGES[code] };
 }
@@ -345,25 +290,199 @@ export function cancelledReportSoFar(progress: Progress): Report {
   return JSON.parse(JSON.stringify(report(progress.included, halt))) as Report;
 }
 
+// What the runner asks of its caller while a plan runs. `stop` is asked
+// between steps, and in a forEach between items. `pageLoad` is asked after
+// each call of a capability that may load a page. `show` gets what the
+// working view shows.
+type Callbacks = {
+  ask: Ask;
+  stop: () => Stop | undefined;
+  pageLoad: () => boolean | Promise<boolean>;
+  show?: (shown: Shown) => void;
+};
+
+// What the parts of a running plan share.
+type Run = Callbacks & {
+  module: CapabilityModule;
+  progress: Progress;
+  outputs: unknown[];
+  confirmOver: number;
+};
+
+// A checkpoint asks once, before the plan's first step, ahead of the step's
+// own confirmation (contract-plan.md, Checkpoint).
+async function askCheckpoint(plan: Plan, ask: Ask): Promise<Halt | undefined> {
+  const go = await ask({
+    items: plan.progress === undefined ? [] : [[plan.progress]],
+    checkpoint: true,
+  });
+  return go ? undefined : stopHalt(1, "cancelled");
+}
+
+// A call step asks when its capability asks, or with `count` when it is the
+// first of many steps of one write capability: it asks for all of them
+// (contract-plan.md, Confirmation).
+async function confirmCall(
+  call: Prepared,
+  count: number | undefined,
+  number: number,
+  ask: Ask,
+): Promise<Halt | undefined> {
+  if (!asks(call.capability) && count === undefined) {
+    return undefined;
+  }
+  const go = await ask({
+    items: [[await confirmText(call)]],
+    ...(count === undefined ? {} : { count }),
+  });
+  return go ? undefined : stopHalt(number, "cancelled");
+}
+
+// When a forEach asks, the arguments of every item are filled in and checked
+// first, so a bad item halts it before the user is asked; the item is named
+// in the message, since no item ran. Returns the prepared calls when it
+// asked, or the halt when the user cancels.
+async function confirmForEach(
+  step: ForEachStep,
+  items: unknown[],
+  number: number,
+  run: Run,
+): Promise<{ prepared?: Prepared[][]; halt?: Halt }> {
+  const { module, outputs } = run;
+  const asking = step.do.map((call) =>
+    asks(capabilityOf(call, module), items.length, run.confirmOver),
+  );
+  if (items.length === 0 || !asking.includes(true)) {
+    return {};
+  }
+  const prepared = items.map((item, k) => {
+    try {
+      return step.do.map((call) => prepare(call, module, { outputs, item }));
+    } catch (err) {
+      if (err instanceof Failure) {
+        throw new Failure(err.code, `item ${k}: ${err.message}`);
+      }
+      throw err;
+    }
+  });
+  const shown: string[][] = [];
+  for (const calls of prepared.slice(0, SHOWN_ITEMS)) {
+    const texts: string[] = [];
+    for (const [j, call] of calls.entries()) {
+      if (asking[j]) {
+        texts.push(await confirmText(call));
+      }
+    }
+    shown.push(texts);
+  }
+  const count = items.length > SHOWN_ITEMS ? { count: items.length } : {};
+  if (!(await run.ask({ items: shown, ...count }))) {
+    return { halt: stopHalt(number, "cancelled") };
+  }
+  return { prepared };
+}
+
+// The halt of a forEach, with its output so far when the step includes it.
+function forEachHalt(step: ForEachStep, output: unknown[][], halt: Halt) {
+  if (step.includeOutput) {
+    halt.outputs = output;
+  }
+  return halt;
+}
+
+// Runs a forEach and adds its output to the outputs, or returns its halt. A
+// failure before its first item is thrown.
+async function runForEach(
+  step: ForEachStep,
+  number: number,
+  run: Run,
+): Promise<Halt | undefined> {
+  const { module, outputs, progress } = run;
+  const items = resolve(step.forEach, { outputs });
+  if (!Array.isArray(items)) {
+    throw new Failure("reference", `${step.forEach} is not an array`);
+  }
+  if (items.length > MAX_ITEMS) {
+    throw new Failure("limit", `${items.length} items, at most ${MAX_ITEMS}`);
+  }
+  const { prepared, halt } = await confirmForEach(step, items, number, run);
+  if (halt !== undefined) {
+    return halt;
+  }
+  const output: unknown[][] = [];
+  if (step.includeOutput) {
+    progress.output = output;
+  }
+  run.show?.({ step: number, done: 0, all: items.length });
+  for (const [k, item] of items.entries()) {
+    const stopped = k > 0 ? run.stop() : undefined;
+    if (stopped) {
+      // The items that ran are all complete, so `do` is not set.
+      return forEachHalt(step, output, {
+        ...stopHalt(number, stopped),
+        item: k,
+      });
+    }
+    const calls: unknown[] = [];
+    output.push(calls);
+    for (const [j, call] of step.do.entries()) {
+      progress.item = k;
+      progress.do = j;
+      try {
+        const next =
+          prepared?.[k][j] ?? prepare(call, module, { outputs, item });
+        progress.pageLoad = next.capability.pageLoad === true;
+        calls.push(await execute(next));
+      } catch (err) {
+        if (!(err instanceof Failure)) {
+          throw err;
+        }
+        return forEachHalt(step, output, {
+          step: number,
+          code: err.code,
+          message: cut(err.message),
+          item: k,
+          do: j,
+        });
+      }
+      const lastCall = j === step.do.length - 1;
+      if (
+        !(lastCall && k === items.length - 1) &&
+        progress.pageLoad &&
+        (await run.pageLoad())
+      ) {
+        // The next call, or the first call of the next item.
+        return forEachHalt(step, lastCall ? [...output, []] : output, {
+          step: number,
+          code: "navigated",
+          message: NAVIGATED_MESSAGE,
+          item: lastCall ? k + 1 : k,
+          do: lastCall ? 0 : j + 1,
+        });
+      }
+    }
+    run.show?.({ step: number, done: k + 1, all: items.length });
+  }
+  outputs.push(output);
+  return undefined;
+}
+
 // Runs a plan that passed checkPlan and returns its report. When the user
-// cancels at a confirmation, the halt has the code `cancelled`. `stop` is
-// asked between steps, and in a forEach between items; a step or an item that
-// started always finishes. `pageLoad` is asked after each call of a capability
-// that may load a page: when a page load started, nothing after it runs and
-// the halt has the code `navigated` at the first step, item or call left, or
-// there is no halt when none is left.
+// cancels at a confirmation, the halt has the code `cancelled`. A step or an
+// item that started always finishes before `stop` ends the plan. When
+// `pageLoad` sees a page load, nothing after it runs and the halt has the
+// code `navigated` at the first step, item or call left, or there is no halt
+// when none is left.
 export async function runPlan(
   plan: Plan,
   module: CapabilityModule,
-  ask: Ask,
-  stop: () => Stop | undefined,
   progress: Progress,
-  pageLoad: () => boolean | Promise<boolean>,
-  show: (shown: Shown) => void = () => {},
+  callbacks: Callbacks,
 ): Promise<Report> {
+  const confirmOver = module.confirmOver ?? DEFAULT_CONFIRM_OVER;
   const outputs: unknown[] = [];
   const included = progress.included;
-  const confirmOver = module.confirmOver ?? DEFAULT_CONFIRM_OVER;
+  const run: Run = { ...callbacks, module, progress, outputs, confirmOver };
   const repeated = repeatedWrites(plan, module, confirmOver);
   let halt: Halt | undefined;
 
@@ -374,168 +493,44 @@ export async function runPlan(
     progress.do = undefined;
     progress.output = undefined;
     progress.pageLoad = false;
-    const stopped = stop();
+    const stopped = run.stop();
     if (stopped) {
       halt = stopHalt(number, stopped);
       break;
     }
-    // A checkpoint asks once, before its first step, ahead of the step's own
-    // confirmation (contract-plan.md, Checkpoint).
-    if (
-      i === 0 &&
-      plan.checkpoint === true &&
-      !(await ask({
-        items: plan.progress === undefined ? [] : [[plan.progress]],
-        checkpoint: true,
-      }))
-    ) {
-      halt = stopHalt(number, "cancelled");
-      break;
+    if (i === 0 && plan.checkpoint === true) {
+      halt = await askCheckpoint(plan, run.ask);
+      if (halt !== undefined) {
+        break;
+      }
     }
     try {
       if (isCall(step)) {
         const call = prepare(step, module, { outputs });
-        // The first of many steps of one write capability asks for all.
         const count = repeated.get(step.call);
         repeated.delete(step.call);
-        if (
-          (asks(call.capability) || count !== undefined) &&
-          !(await ask({
-            items: [[await confirmText(call)]],
-            ...(count === undefined ? {} : { count }),
-          }))
-        ) {
-          halt = stopHalt(number, "cancelled");
-          throw new Stopped();
+        halt = await confirmCall(call, count, number, run.ask);
+        if (halt === undefined) {
+          progress.pageLoad = call.capability.pageLoad === true;
+          run.show?.({ step: number });
+          outputs.push(await execute(call));
         }
-        progress.pageLoad = call.capability.pageLoad === true;
-        show({ step: number });
-        outputs.push(await execute(call));
       } else {
-        const items = resolve(step.forEach, { outputs });
-        if (!Array.isArray(items)) {
-          throw new Failure("reference", `${step.forEach} is not an array`);
-        }
-        if (items.length > MAX_ITEMS) {
-          throw new Failure(
-            "limit",
-            `${items.length} items, at most ${MAX_ITEMS}`,
-          );
-        }
-        const asking = step.do.map((call) =>
-          asks(capabilityOf(call, module), items.length, confirmOver),
-        );
-        // When the step asks, the arguments of every item are filled in and
-        // checked first, so a bad item halts it before the user is asked.
-        let prepared: Prepared[][] | undefined;
-        if (items.length > 0 && asking.includes(true)) {
-          // A bad item is named in the message, since no item ran.
-          prepared = items.map((item, k) => {
-            try {
-              return step.do.map((call) =>
-                prepare(call, module, { outputs, item }),
-              );
-            } catch (err) {
-              if (err instanceof Failure) {
-                throw new Failure(err.code, `item ${k}: ${err.message}`);
-              }
-              throw err;
-            }
-          });
-          const shown: string[][] = [];
-          for (const calls of prepared.slice(0, SHOWN_ITEMS)) {
-            const texts: string[] = [];
-            for (const [j, call] of calls.entries()) {
-              if (asking[j]) {
-                texts.push(await confirmText(call));
-              }
-            }
-            shown.push(texts);
-          }
-          const count =
-            items.length > SHOWN_ITEMS ? { count: items.length } : {};
-          if (!(await ask({ items: shown, ...count }))) {
-            halt = stopHalt(number, "cancelled");
-            throw new Stopped();
-          }
-        }
-        const output: unknown[][] = [];
-        if (step.includeOutput) {
-          progress.output = output;
-        }
-        show({ step: number, done: 0, all: items.length });
-        for (const [k, item] of items.entries()) {
-          const itemStopped = k > 0 ? stop() : undefined;
-          if (itemStopped) {
-            // The items that ran are all complete, so `do` is not set.
-            halt = { ...stopHalt(number, itemStopped), item: k };
-            if (step.includeOutput) {
-              halt.outputs = output;
-            }
-            throw new Stopped();
-          }
-          const calls: unknown[] = [];
-          output.push(calls);
-          for (const [j, call] of step.do.entries()) {
-            progress.item = k;
-            progress.do = j;
-            try {
-              const next =
-                prepared?.[k][j] ?? prepare(call, module, { outputs, item });
-              progress.pageLoad = next.capability.pageLoad === true;
-              calls.push(await execute(next));
-            } catch (err) {
-              const failure = err as Failure;
-              halt = {
-                step: number,
-                code: failure.code,
-                message: cut(failure.message),
-                item: k,
-                do: j,
-              };
-              if (step.includeOutput) {
-                halt.outputs = output;
-              }
-              throw err;
-            }
-            const lastCall = j === step.do.length - 1;
-            if (
-              !(lastCall && k === items.length - 1) &&
-              progress.pageLoad &&
-              (await pageLoad())
-            ) {
-              // The next call, or the first call of the next item.
-              halt = {
-                step: number,
-                code: "navigated",
-                message: NAVIGATED_MESSAGE,
-                item: lastCall ? k + 1 : k,
-                do: lastCall ? 0 : j + 1,
-              };
-              if (step.includeOutput) {
-                halt.outputs = lastCall ? [...output, []] : output;
-              }
-              throw new Stopped();
-            }
-          }
-          show({ step: number, done: k + 1, all: items.length });
-        }
-        outputs.push(output);
+        halt = await runForEach(step, number, run);
       }
     } catch (err) {
-      if (err instanceof Stopped) {
-        break;
-      }
       if (!(err instanceof Failure)) {
         throw err;
       }
-      halt ??= { step: number, code: err.code, message: cut(err.message) };
+      halt = { step: number, code: err.code, message: cut(err.message) };
+    }
+    if (halt !== undefined) {
       break;
     }
     if (step.includeOutput) {
       included.push([number, outputs[i]]);
     }
-    if (progress.pageLoad && (await pageLoad())) {
+    if (progress.pageLoad && (await run.pageLoad())) {
       if (number < plan.steps.length) {
         halt = {
           step: number + 1,

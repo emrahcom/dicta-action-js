@@ -4,6 +4,7 @@
 import type { SiteContext } from "./context.ts";
 import type { CapabilityModule } from "./module.ts";
 import { checkPlan, type Plan } from "./plan.ts";
+import { withoutOldOutputs } from "./exchange.ts";
 import { addHistory, type Outcome } from "./history.ts";
 import { localTime, type Reply, RoundClient } from "./round.ts";
 import {
@@ -16,9 +17,9 @@ import {
   type Report,
   runPlan,
   type Shown,
-  withoutOldOutputs,
 } from "./run.ts";
 import { saveRequest, takeSaved } from "./saved.ts";
+import { STYLE } from "./style.ts";
 
 type View = "working" | "question" | "confirmation";
 
@@ -89,97 +90,6 @@ const MAX_NOTICES = 3;
 const MAX_TEXT_CHARS = 10000;
 // How long the status region stays empty before a new text.
 const ANNOUNCE_DELAY_MS = 100;
-
-const STYLE = `
-  :host {
-    display: block;
-  }
-  [hidden] {
-    display: none !important;
-  }
-  .notices {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-  }
-  /* The parts stack, the buttons last (specs/architecture.md, Display). */
-  .view,
-  .notice {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.5rem;
-    padding: 0.5rem;
-    border: 1px solid #888;
-    background: #fff;
-    color: #222;
-  }
-  .text {
-    max-width: 100%;
-    overflow-wrap: anywhere;
-    /* An info keeps its paragraphs. */
-    white-space: pre-line;
-  }
-  .status {
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-  }
-  .buttons {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-  }
-  /* A question's options, one per line. */
-  .buttons.column {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-  .label:empty {
-    display: none;
-  }
-  .indicator {
-    flex: none;
-    box-sizing: border-box;
-    width: 1rem;
-    height: 1rem;
-    border: 2px solid #888;
-    border-top-color: #1a5fb4;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-  }
-  @keyframes spin {
-    to {
-      transform: rotate(360deg);
-    }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .indicator {
-      animation: none;
-    }
-  }
-  button {
-    padding: 0.25rem 0.75rem;
-    border: 1px solid #888;
-    background: #fff;
-    color: #222;
-    font: inherit;
-  }
-  button:focus-visible,
-  .notice:focus-visible {
-    outline: 2px solid #1a5fb4;
-    outline-offset: 2px;
-  }
-  /* For screen readers only. */
-  .announcer {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
-`;
 
 // The browser's Navigation API, when it has one.
 function navigationApi(): EventTarget | undefined {
@@ -560,35 +470,7 @@ export class DictaAction extends HTMLElement {
         if (text) {
           this.#announce(text);
         }
-        request.plan = plan;
-        request.progress = newProgress();
-        try {
-          report = await runPlan(
-            plan as Plan,
-            client.module,
-            (confirmation) => this.#ask(request, confirmation, text),
-            () => {
-              if (this.#request !== request) {
-                return "cancelled";
-              }
-              return request.added.length > 0 ? "interrupted" : undefined;
-            },
-            request.progress,
-            async () => {
-              // A seen page load is not waited on, or the new page may come
-              // first. WebKit fires navigate for location.reload() a task
-              // later.
-              if (request.pageLoad !== true) {
-                await new Promise((resolve) => setTimeout(resolve, 0));
-              }
-              return this.#request === request && request.pageLoad === true;
-            },
-            (shown) => this.#showStep(request, plan as Plan, shown),
-          );
-        } finally {
-          request.plan = undefined;
-          request.progress = undefined;
-        }
+        report = await this.#runChecked(request, plan as Plan, client.module);
       }
     } catch (err) {
       if (this.#request === request) {
@@ -616,6 +498,36 @@ export class DictaAction extends HTMLElement {
     // Text that came after the last step follows the report without a halt.
     this.#takeAdded(request);
     void this.#round(request);
+  }
+
+  // Runs a checked plan as the request's running plan, which is reset right
+  // after the run, before a failure is shown or the report is kept.
+  async #runChecked(request: Request, plan: Plan, module: CapabilityModule) {
+    request.plan = plan;
+    request.progress = newProgress();
+    try {
+      return await runPlan(plan, module, request.progress, {
+        ask: (confirmation) => this.#ask(request, confirmation, plan.text),
+        stop: () => {
+          if (this.#request !== request) {
+            return "cancelled";
+          }
+          return request.added.length > 0 ? "interrupted" : undefined;
+        },
+        pageLoad: async () => {
+          // A seen page load is not waited on, or the new page may come
+          // first. WebKit fires navigate for location.reload() a task later.
+          if (request.pageLoad !== true) {
+            await new Promise((resolve) => setTimeout(resolve, 0));
+          }
+          return this.#request === request && request.pageLoad === true;
+        },
+        show: (shown) => this.#showStep(request, plan, shown),
+      });
+    } finally {
+      request.plan = undefined;
+      request.progress = undefined;
+    }
   }
 
   // The report of a plan that fails the check: no step ran, so its halt has
